@@ -3,14 +3,12 @@
 services:
   artcraft-hub:
     image: ghcr.io/cj0206/artcrafthub:latest
-    # No registry? Use a Git repository stack in Portainer and swap the line above for:
-    # build: .
     container_name: artcraft-hub
     init: true
     restart: unless-stopped
-    user: "1026:100"
+    user: "0:0"
     ports:
-      - "8080:8080"
+      - "8086:8080"
     environment:
       ADMIN_TOKEN: ${ADMIN_TOKEN:?Set ADMIN_TOKEN to a long random string}
       UPDATE_INTERVAL_HOURS: "6"
@@ -27,6 +25,3 @@ services:
       - no-new-privileges:true
     labels:
       - com.centurylinklabs.watchtower.enable=true
-
-volumes:
-  artcraft-data:
