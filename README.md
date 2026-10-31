@@ -18,7 +18,7 @@ You need a long random admin token. Generate one with `openssl rand -hex 24`.
 
 **Option B: pull a prebuilt image.** Push this folder to GitHub. The included workflow builds a multi-architecture image to `ghcr.io/<you>/artcraft-hub:latest` on every push and weekly. Make the package public (or add registry credentials in Portainer), put your username in `docker-compose.yml`, and deploy it as a web-editor stack.
 
-The first start downloads the default apps in the background. Open `http://<server>:8080/`, press **Manage**, and watch them install.
+The first start downloads the default apps in the background. Open `http://<server>:8086/`, press **Manage**, and watch them install.
 
 ### HTTPS is required for public use
 
