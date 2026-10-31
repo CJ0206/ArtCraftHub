@@ -19,6 +19,7 @@
     for (const kid of kids.flat()) if (kid != null) el.append(kid);
     return el;
   }
+  const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
   const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '';
   let toastTimer;
   function toast(msg) {
@@ -28,17 +29,45 @@
 
   // ---------- state ----------
   let apps = [];
+  let categories = {};         // group name -> colour chosen by the owner
   let openIds = [];            // tab order
   let active = 'home';
   const frames = new Map();    // id -> iframe (created lazily, kept alive while the tab is open)
   const appById = (id) => apps.find((a) => a.id === id);
 
+  // ---------- group colours ----------
+  const DEFAULT_CAT = { Office: 'var(--accent)', Create: 'var(--rose)', Other: 'var(--sage)' };
+  const PRESETS = ['#8fa5ff', '#f08fa6', '#8fd1b0', '#f5c26b', '#c4a1ff', '#6fd0e0', '#ff9f7a', '#a6b1c2'];
+  const HEX = /^#[0-9a-f]{6}$/i;
+
+  function catColour(name) {
+    if (hasOwn(categories, name) && HEX.test(categories[name])) return categories[name];
+    if (hasOwn(DEFAULT_CAT, name)) return DEFAULT_CAT[name];
+    let n = 0; for (const ch of name) n = (n * 31 + ch.charCodeAt(0)) >>> 0;
+    return PRESETS[n % PRESETS.length];
+  }
+  function inkFor(hex) {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+      .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.4 ? '#10131a' : '#ffffff';
+  }
+  // Colours are set through the style API, which the page's strict policy allows.
+  function paint(el, cat) {
+    const c = catColour(cat || 'Other');
+    el.style.setProperty('--cat', c);
+    el.style.setProperty('--cat-ink', c.startsWith('#') ? inkFor(c) : 'var(--accent-ink)');
+    return el;
+  }
+
   // ---------- theme ----------
   function applyTheme(t) {
     document.documentElement.dataset.theme = t;
     const next = t === 'dark' ? 'Light theme' : 'Dark theme';
-    $('#themeBtn').textContent = next;
+    $('#themeLbl').textContent = next;
     $('#themeBtn').setAttribute('aria-label', `Switch to ${next.toLowerCase()}`);
+    $('#themeBtn').title = `Switch to ${next.toLowerCase()}`;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', t === 'dark' ? '#171a21' : '#f4f5f8');
   }
   $('#themeBtn').addEventListener('click', () => {
     const t = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
@@ -46,45 +75,88 @@
   });
   applyTheme(document.documentElement.dataset.theme);
 
-  // ---------- home ----------
+  // ---------- dialogs ----------
+  document.addEventListener('click', (e) => {
+    const closer = e.target.closest && e.target.closest('[data-close]');
+    if (closer) closer.closest('dialog')?.close();
+  });
+  $('#helpBtn').addEventListener('click', () => $('#helpDlg').showModal());
+
+  // ---------- loading the app list, and noticing changes ----------
+  let lastSig = '';
+  let lastPoll = 0;
+  let baseline = null;         // what this page was loaded with: id -> {name, version}
+  const snapshot = () => new Map(apps.map((a) => [a.id, { name: a.name, version: a.version || '' }]));
+
+  function checkForChanges() {
+    if (!baseline) { baseline = snapshot(); return; }
+    const now = snapshot();
+    const msgs = [];
+    for (const [id, cur] of now) {
+      const old = baseline.get(id);
+      if (!old) msgs.push(`${cur.name} was added`);
+      else if (old.version !== cur.version) msgs.push(cur.version ? `${cur.name} updated to ${cur.version}` : `${cur.name} updated`);
+    }
+    for (const [id, old] of baseline) if (!now.has(id)) msgs.push(`${old.name} was removed`);
+    const bar = $('#updateBanner');
+    if (!msgs.length) { bar.hidden = true; return; }
+    const shown = msgs.slice(0, 3).join(', ') + (msgs.length > 3 ? ` and ${msgs.length - 3} more` : '');
+    $('#updateText').textContent = `${shown}. ${frames.size ? 'Save your work, then refresh' : 'Refresh'} to load the changes.`;
+    bar.hidden = false;
+  }
+  $('#refreshBtn').addEventListener('click', () => location.reload());
+  $('#dismissBtn').addEventListener('click', () => { baseline = snapshot(); $('#updateBanner').hidden = true; });
+
   async function loadApps() {
+    let data;
     try {
       const res = await fetch('/api/apps', { cache: 'no-store' });
       if (!res.ok) throw new Error();
-      apps = (await res.json()).apps;
+      data = await res.json();
     } catch {
-      $('#groups').replaceChildren(h('p', { class: 'empty', text: 'Could not load the app list. Check your connection and reload.' }));
+      if (!apps.length) $('#groups').replaceChildren(h('p', { class: 'empty', text: 'Could not load the app list. Check your connection and reload.' }));
       return false;
     }
-    renderHome(); renderTabs();
+    lastPoll = Date.now();
+    apps = data.apps || [];
+    categories = data.categories || {};
+    checkForChanges();
+    const sig = JSON.stringify([apps, categories]);
+    if (sig !== lastSig) { lastSig = sig; renderHome(); renderTabs(); }
     return true;
   }
+  setInterval(() => { if (!document.hidden) loadApps(); }, 5 * 60 * 1000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - lastPoll > 60 * 1000) loadApps(); });
+
+  // ---------- home ----------
+  const catOrder = (names) => {
+    const first = ['Office', 'Create'];
+    return [...names].sort((a, b) => {
+      const ia = first.indexOf(a), ib = first.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
+    });
+  };
 
   function renderHome() {
     const groups = new Map();
     for (const a of apps) { const c = a.category || 'Other'; if (!groups.has(c)) groups.set(c, []); groups.get(c).push(a); }
-    const order = ['Office', 'Create'];
-    const names = [...groups.keys()].sort((a, b) => {
-      const ia = order.indexOf(a), ib = order.indexOf(b);
-      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
-    });
-    if (!names.length) {
+    if (!groups.size) {
       $('#groups').replaceChildren(h('p', { class: 'empty', text: 'No apps are installed yet. If you run this server, use Manage to add one. New installs can take a minute to download.' }));
       return;
     }
-    $('#groups').replaceChildren(...names.map((cat) =>
-      h('section', { class: 'group', 'data-cat': cat },
+    $('#groups').replaceChildren(...catOrder(groups.keys()).map((cat) =>
+      paint(h('section', { class: 'group' },
         h('h2', {}, h('span', { class: 'dot' }), cat),
-        h('div', { class: 'tiles' }, groups.get(cat).map(tile)))));
+        h('div', { class: 'tiles' }, groups.get(cat).map(tile))), cat)));
   }
 
   function tile(a) {
     const letter = h('span', { class: 'ico letter', 'aria-hidden': 'true', text: a.name.slice(0, 1).toUpperCase() });
     const icon = a.icon
-      ? h('img', { class: 'ico', src: `/icons/${a.id}.png`, alt: '', width: 56, height: 56, onerror(e) { e.target.replaceWith(letter); } })
+      ? h('img', { class: 'ico', src: `/icons/${a.id}.png`, alt: '', width: 64, height: 64, onerror(e) { e.target.replaceWith(letter); } })
       : letter;
     const isOpen = openIds.includes(a.id);
-    return h('button', { class: 'tile', type: 'button', 'data-cat': a.category || 'Other', onclick: () => openApp(a.id) },
+    return h('button', { class: 'tile', type: 'button', onclick: () => openApp(a.id) },
       icon,
       h('span', {},
         h('span', { class: 'name', text: a.name }),
@@ -94,13 +166,11 @@
 
   // ---------- tabs ----------
   function renderTabs() {
-    const bar = $('#tabs');
     const tabs = [tabEl({ id: 'home', name: 'Home' })];
     for (const id of openIds) { const a = appById(id); if (a) tabs.push(tabEl(a)); }
-    bar.replaceChildren(...tabs);
-    renderHomeOpenMarkers();
+    $('#tabs').replaceChildren(...tabs);
+    if ($('#groups').children.length) renderHome(); // refresh the "Open in a tab" markers
   }
-  function renderHomeOpenMarkers() { if ($('#groups').children.length) renderHome(); }
 
   function tabEl(a) {
     const isHome = a.id === 'home';
@@ -110,8 +180,9 @@
       'aria-controls': isHome ? 'home' : `frame-${a.id}`, tabindex: isActive ? '0' : '-1',
       onclick: () => activate(a.id), onkeydown: tabKeys,
     }, isHome ? null : h('span', { class: 'dot' }), h('span', { class: 'label', text: a.name }));
-    const wrap = h('div', { class: 'tab' + (isActive ? ' active' : '') + (!isHome && !frames.has(a.id) ? ' unloaded' : ''), role: 'presentation', 'data-cat': a.category || '' }, main);
+    const wrap = h('div', { class: 'tab' + (isActive ? ' active' : '') + (!isHome && !frames.has(a.id) ? ' unloaded' : ''), role: 'presentation' }, main);
     if (!isHome) {
+      paint(wrap, a.category);
       wrap.append(h('button', { class: 'x', type: 'button', 'aria-label': `Close ${a.name}`, title: 'Close tab', onclick: (e) => { e.stopPropagation(); closeApp(a.id); } }, '×'));
       wrap.addEventListener('auxclick', (e) => { if (e.button === 1) { e.preventDefault(); closeApp(a.id); } });
     }
@@ -153,7 +224,7 @@
       const f = frames.get(id) || makeFrame(a);
       f.classList.add('active'); f.inert = false;
       document.title = `${a.name} · ArtCraft Hub`;
-      requestAnimationFrame(() => { try { f.contentWindow.focus(); } catch { /* cross-origin or not ready */ } });
+      requestAnimationFrame(() => { try { f.contentWindow.focus(); } catch { /* not ready */ } });
       keepStorage();
     } else {
       document.title = 'ArtCraft Hub';
@@ -214,6 +285,7 @@
   let token = '';              // memory only: never written to storage
   let pollTimer = null;
   let editingId = null;
+  let lastAdminList = [];
   const dlg = $('#manageDlg');
 
   async function api(path, opts = {}) {
@@ -226,8 +298,9 @@
 
   function showAdmin(on) { $('#loginView').hidden = on; $('#adminView').hidden = !on; }
 
-  $('#manageBtn').addEventListener('click', () => { dlg.showModal(); if (token) refreshAdmin(); else { showAdmin(false); $('#tokenInput').focus(); } });
+  $('#manageBtn').addEventListener('click', () => { dlg.showModal(); if (token) refreshAdmin().catch(() => showAdmin(false)); else { showAdmin(false); $('#tokenInput').focus(); } });
   $('#manageClose').addEventListener('click', () => dlg.close());
+  $('#howBtn').addEventListener('click', () => $('#helpDlg').showModal());
   dlg.addEventListener('close', () => { clearInterval(pollTimer); pollTimer = null; loadApps(); });
   $('#tokenInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#loginBtn').click(); });
   $('#loginBtn').addEventListener('click', async () => {
@@ -236,15 +309,19 @@
     try { await refreshAdmin(); }
     catch (err) { token = ''; $('#loginErr').textContent = err.message; showAdmin(false); }
   });
-  $('#logoutBtn').addEventListener('click', () => { token = ''; showAdmin(false); clearInterval(pollTimer); });
+  $('#logoutBtn').addEventListener('click', () => { token = ''; showAdmin(false); clearInterval(pollTimer); pollTimer = null; });
 
   async function refreshAdmin() {
     const data = await api('/api/admin/apps');
+    categories = data.categories || {};
+    lastAdminList = data.apps;
     showAdmin(true);
     $('#adminNote').textContent = data.intervalHours > 0
       ? `Apps check GitHub for new releases every ${data.intervalHours} hours.`
       : 'Automatic update checks are turned off.';
     renderAdminList(data.apps);
+    renderCategoryEditor(data.apps);
+    $('#catList').replaceChildren(...catOrder(new Set(['Office', 'Create', 'Other', ...data.apps.map((a) => a.category).filter(Boolean)])).map((c) => h('option', { value: c })));
     const busy = data.apps.some((a) => a.installing);
     if (busy && !pollTimer) pollTimer = setInterval(() => refreshAdmin().catch(() => {}), 3000);
     if (!busy && pollTimer) { clearInterval(pollTimer); pollTimer = null; }
@@ -257,16 +334,43 @@
       else if (a.error) status = h('span', { class: 'bad', text: a.error });
       else if (a.installed) status = h('span', { class: 'meta', text: `Version ${a.version}, installed ${fmtDate(a.updatedAt)}, last checked ${fmtDate(a.checkedAt)}` });
       else status = h('span', { class: 'meta', text: 'Waiting for the first install…' });
-      return h('li', {},
+      return paint(h('li', {},
         h('div', { class: 'top' },
-          h('span', { class: 'nm', text: `${a.name}` }),
+          h('span', { class: 'nm' }, h('span', { class: 'dot' }), a.name),
           h('span', { class: 'btns' },
             h('button', { class: 'btn', type: 'button', onclick: () => updateOne(a) }, 'Update now'),
             h('button', { class: 'btn', type: 'button', onclick: () => editApp(a) }, 'Edit'),
             h('button', { class: 'btn danger', type: 'button', onclick: () => removeApp(a) }, 'Remove'))),
         h('span', { class: 'meta', text: `${a.repo} · group: ${a.category}` }),
-        status);
+        status), a.category);
     }));
+  }
+
+  function renderCategoryEditor(list) {
+    const names = catOrder(new Set(list.map((a) => a.category || 'Other')));
+    $('#catEditor').replaceChildren(...names.map((name) => {
+      const current = catColour(name);
+      const swatches = PRESETS.map((c) => {
+        const b = h('button', { class: 'sw', type: 'button', 'aria-label': `Use ${c} for ${name}`, 'aria-pressed': String(current.toLowerCase() === c), onclick: () => setCategoryColour(name, c) });
+        b.style.background = c;
+        return b;
+      });
+      const picker = h('input', { type: 'color', 'aria-label': `Custom colour for ${name}`, value: current.startsWith('#') ? current : '#8fa5ff', onchange: (e) => setCategoryColour(name, e.target.value) });
+      return paint(h('div', { class: 'catrow' },
+        h('span', { class: 'nm' }, h('span', { class: 'dot' }), name),
+        h('span', { class: 'swatches' }, swatches, picker),
+        h('button', { class: 'btn ghost', type: 'button', onclick: () => setCategoryColour(name, '') }, 'Reset')), name);
+    }));
+  }
+
+  async function setCategoryColour(name, colour) {
+    try {
+      const data = await api('/api/admin/categories', { method: 'PUT', body: JSON.stringify({ name, color: colour }) });
+      categories = data.categories || {};
+      lastSig = ''; renderHome(); renderTabs();
+      renderAdminList(lastAdminList); renderCategoryEditor(lastAdminList);
+      toast(colour ? `Colour saved for ${name}.` : `Colour reset for ${name}.`);
+    } catch (e) { toast(e.message); }
   }
 
   async function updateOne(a) {
@@ -277,7 +381,7 @@
     if (!confirm(`Remove ${a.name}?\n\nIt will disappear from the hub for everyone. You can add it again later.`)) return;
     try {
       await api(`/api/admin/apps/${a.id}`, { method: 'DELETE' });
-      if (openIds.includes(a.id)) { frames.get(a.id)?.remove(); frames.delete(a.id); openIds = openIds.filter((x) => x !== a.id); if (active === a.id) active = 'home'; }
+      if (openIds.includes(a.id)) { frames.get(a.id)?.remove(); frames.delete(a.id); openIds = openIds.filter((x) => x !== a.id); if (active === a.id) activate('home'); }
       toast(`Removed ${a.name}.`); await refreshAdmin();
     } catch (e) { toast(e.message); }
   }

@@ -33,12 +33,17 @@ const APPS_FILE = path.join(DATA_DIR, 'apps.json');
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
 const APPS_DIR = path.join(DATA_DIR, 'apps');
 const TMP_DIR = path.join(DATA_DIR, 'tmp');
+const CATS_FILE = path.join(DATA_DIR, 'categories.json');   // group colours chosen in Manage
+const SEEN_FILE = path.join(DATA_DIR, 'defaults-seen.json'); // default apps this install has already been offered
+const LEGACY_DEFAULT_IDS = ['wordcraft', 'gridcraft', 'deckcraft', 'pdfcraft', 'designcraft']; // shipped before defaults sync existed
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 
 // ---------- config + state persistence ----------
 let apps = [];
 let state = {};
+let categories = Object.create(null);
 
 async function writeJson(file, data) {
   const tmp = `${file}.${process.pid}.tmp`;
@@ -50,17 +55,39 @@ async function readJson(file, fallback) {
 }
 const saveApps = () => writeJson(APPS_FILE, apps);
 const saveState = () => writeJson(STATE_FILE, state);
+const saveCategories = () => writeJson(CATS_FILE, categories);
+
+async function loadDefaults() {
+  const raw = JSON.parse(await fsp.readFile(path.join(__dirname, 'default-apps.json'), 'utf8'));
+  return raw.filter((d) => ID_RE.test(String(d.id || '')) && normaliseRepo(d.repo)).map((d) => ({
+    id: d.id, repo: normaliseRepo(d.repo), name: cleanText(d.name, 60) || d.id,
+    category: cleanText(d.category, 30) || 'Other', description: cleanText(d.description, 160),
+    assetPattern: d.assetPattern ? cleanText(d.assetPattern, 120) : undefined,
+  }));
+}
 
 async function init() {
   await fsp.mkdir(APPS_DIR, { recursive: true });
   await fsp.rm(TMP_DIR, { recursive: true, force: true });
   await fsp.mkdir(TMP_DIR, { recursive: true });
+  const defaults = await loadDefaults();
   apps = await readJson(APPS_FILE, null);
-  if (!apps) {
-    apps = JSON.parse(await fsp.readFile(path.join(__dirname, 'default-apps.json'), 'utf8'));
-    await saveApps();
-  }
+  if (!apps) { apps = defaults.map((d) => ({ ...d })); await saveApps(); }
   state = await readJson(STATE_FILE, {});
+  categories = Object.assign(Object.create(null), await readJson(CATS_FILE, {}));
+
+  // New apps added to default-apps.json reach existing installs too. An app the owner
+  // removed stays removed, because its id is remembered as already offered.
+  let seen = await readJson(SEEN_FILE, null);
+  if (!Array.isArray(seen)) seen = [...new Set([...apps.map((a) => a.id), ...LEGACY_DEFAULT_IDS])];
+  const added = [];
+  for (const d of defaults) {
+    if (seen.includes(d.id)) continue;
+    seen.push(d.id);
+    if (!apps.some((a) => a.id === d.id)) { apps.push({ ...d }); added.push(d.name); }
+  }
+  if (added.length) { await saveApps(); log(`Added new default apps: ${added.join(', ')}`); }
+  await writeJson(SEEN_FILE, seen);
 }
 
 // ---------- validation ----------
@@ -317,6 +344,7 @@ const publicView = (a) => ({
   id: a.id, name: a.name, category: a.category, description: a.description,
   version: state[a.id]?.version || null, updatedAt: state[a.id]?.installedAt || null, icon: hasIcon(a.id),
 });
+const catsView = () => ({ ...categories });
 const adminView = (a) => ({
   ...a, ...publicView(a), installed: isInstalled(a.id), installing: installing.has(a.id),
   checkedAt: state[a.id]?.checkedAt || null, error: state[a.id]?.error || null, asset: state[a.id]?.asset || null,
@@ -327,7 +355,7 @@ async function handleAdmin(req, res, url) {
   const parts = url.pathname.split('/').filter(Boolean); // api admin apps [id] [action]
   const [, , what, id, action] = parts;
   try {
-    if (what === 'apps' && !id && req.method === 'GET') return sendJson(res, 200, { apps: apps.map(adminView), intervalHours: UPDATE_HOURS });
+    if (what === 'apps' && !id && req.method === 'GET') return sendJson(res, 200, { apps: apps.map(adminView), categories: catsView(), intervalHours: UPDATE_HOURS });
 
     if (what === 'apps' && !id && req.method === 'POST') {
       const b = await readBody(req);
@@ -367,6 +395,18 @@ async function handleAdmin(req, res, url) {
       return sendJson(res, 202, { ok: true });
     }
 
+    if (what === 'categories' && !id && req.method === 'PUT') {
+      const b = await readBody(req);
+      const name = cleanText(b.name, 30);
+      if (!name || ['__proto__', 'constructor', 'prototype'].includes(name)) return sendJson(res, 400, { error: 'Enter a group name.' });
+      if (b.color) {
+        if (!HEX_RE.test(String(b.color))) return sendJson(res, 400, { error: 'The colour must look like #8fa5ff.' });
+        categories[name] = String(b.color).toLowerCase();
+      } else delete categories[name];
+      await saveCategories();
+      return sendJson(res, 200, { categories: catsView() });
+    }
+
     if (what === 'check' && req.method === 'POST') { checkAll(); return sendJson(res, 202, { ok: true }); }
     return sendJson(res, 404, { error: 'Not found.' });
   } catch (err) {
@@ -377,7 +417,7 @@ async function handleAdmin(req, res, url) {
 // ---------- routing ----------
 const server = http.createServer(async (req, res) => {
   try {
-    if (!['GET', 'HEAD', 'POST', 'DELETE'].includes(req.method)) return sendText(res, 405, 'Method not allowed');
+    if (!['GET', 'HEAD', 'POST', 'DELETE', 'PUT'].includes(req.method)) return sendText(res, 405, 'Method not allowed');
     const url = new URL(req.url, 'http://x');
     const p = url.pathname;
 
@@ -385,7 +425,7 @@ const server = http.createServer(async (req, res) => {
 
     if (p.startsWith('/api/admin/')) return handleAdmin(req, res, url);
     if (p === '/api/apps' && req.method === 'GET') {
-      return sendJson(res, 200, { apps: apps.filter((a) => isInstalled(a.id)).map(publicView) });
+      return sendJson(res, 200, { apps: apps.filter((a) => isInstalled(a.id)).map(publicView), categories: catsView() });
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') return sendText(res, 405, 'Method not allowed');
 

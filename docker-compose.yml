@@ -1,12 +1,11 @@
-# Paste this into Portainer: Stacks > Add stack > Web editor.
-# Add ADMIN_TOKEN under "Environment variables" (a long random string).
+# Portainer: Stacks > Add stack > Web editor, paste this, then add ADMIN_TOKEN
+# under "Environment variables" (a long random string, e.g. from: openssl rand -hex 24).
 services:
   artcraft-hub:
     image: ghcr.io/cj0206/artcrafthub:latest
     container_name: artcraft-hub
     init: true
     restart: unless-stopped
-    user: "0:0"
     ports:
       - "8086:8080"
     environment:
@@ -15,13 +14,18 @@ services:
       # GITHUB_TOKEN: ""            # optional, raises GitHub's API rate limit
       # CROSS_ORIGIN_ISOLATION: "1" # only if an app needs multi-threaded WebAssembly
     volumes:
-      - /portainer/Files/AppData/Config/ArtCraftHub:/data
+      # Keeps your app list and downloaded apps when the container is updated.
+      # To use a folder instead, replace the line below with e.g.
+      #   - /portainer/Files/AppData/Config/ArtCraftHub:/data
+      - artcraft-data:/data
     read_only: true
     tmpfs:
       - /tmp
-    cap_drop:
-      - ALL
     security_opt:
       - no-new-privileges:true
     labels:
       - com.centurylinklabs.watchtower.enable=true
+
+volumes:
+  artcraft-data:
+    name: artcraft-data
