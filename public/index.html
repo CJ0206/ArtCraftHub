@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>ArtCraft Hub</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/_hub/app.css">
+  <script src="/_hub/theme-init.js"></script>
+</head>
+<body>
+  <header class="bar">
+    <a class="brand" href="/" aria-label="ArtCraft Hub home">
+      <svg viewBox="0 0 32 32" width="22" height="22" aria-hidden="true"><path d="M7 22V10h7a4 4 0 0 1 0 8H7" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><circle cx="22" cy="21" r="3.5" fill="var(--rose)"/></svg>
+      <span>ArtCraft Hub</span>
+    </a>
+    <div class="tabs" id="tabs" role="tablist" aria-label="Open apps"></div>
+    <div class="actions">
+      <button class="btn ghost" id="themeBtn" type="button"></button>
+      <button class="btn ghost" id="manageBtn" type="button">Manage</button>
+    </div>
+  </header>
+
+  <main id="stage">
+    <section class="home" id="home" role="tabpanel" aria-labelledby="tab-home">
+      <div class="home-inner">
+        <h1>Open a tool</h1>
+        <p class="lede">Each app opens in its own tab. Switch between them without losing your place.</p>
+        <div id="groups" aria-live="polite"></div>
+        <p class="privacy">Your files stay on your device. Opening and saving happens in your browser, and nothing is uploaded to this server.</p>
+        <fieldset class="prefs">
+          <legend>Preferences</legend>
+          <label><input type="checkbox" id="warnPref"> Warn me before I close this page while apps are open</label>
+          <label><input type="checkbox" id="restorePref"> Reopen my tabs when I come back</label>
+          <p class="note" id="storageNote"></p>
+        </fieldset>
+      </div>
+    </section>
+    <div id="frames"></div>
+  </main>
+
+  <dialog id="manageDlg" aria-labelledby="manageTitle">
+    <div class="dlg-head">
+      <h2 id="manageTitle">Manage apps</h2>
+      <button class="btn ghost" id="manageClose" type="button" aria-label="Close">Close</button>
+    </div>
+    <div id="loginView">
+      <p>Enter the admin token set in the container’s <code>ADMIN_TOKEN</code> variable.</p>
+      <div class="row">
+        <input id="tokenInput" type="password" autocomplete="off" aria-label="Admin token" placeholder="Admin token">
+        <button class="btn solid" id="loginBtn" type="button">Sign in</button>
+      </div>
+      <p class="err" id="loginErr" role="alert"></p>
+    </div>
+    <div id="adminView" hidden>
+      <div class="row spread">
+        <p class="note" id="adminNote"></p>
+        <div class="row">
+          <button class="btn" id="checkAllBtn" type="button">Check for updates</button>
+          <button class="btn ghost" id="logoutBtn" type="button">Sign out</button>
+        </div>
+      </div>
+      <ul class="applist" id="adminList"></ul>
+      <h3 id="formTitle">Add an app</h3>
+      <div class="form" id="addForm">
+        <label>GitHub repository<input id="fRepo" placeholder="owner/name or https://github.com/owner/name"></label>
+        <label>Name<input id="fName" placeholder="Shown on the card"></label>
+        <label>Group<input id="fCat" placeholder="Office, Create, Other…" list="catList"></label>
+        <datalist id="catList"><option value="Office"><option value="Create"><option value="Other"></datalist>
+        <label class="wide">Description<input id="fDesc" placeholder="One short line"></label>
+        <label class="wide">Release file pattern <span class="hint">(optional)</span><input id="fPattern" placeholder="-web-.*\.zip$"></label>
+        <div class="row wide">
+          <button class="btn solid" id="saveAppBtn" type="button">Add app</button>
+          <button class="btn ghost" id="cancelEditBtn" type="button" hidden>Cancel edit</button>
+        </div>
+        <p class="err wide" id="formErr" role="alert"></p>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/_hub/app.js" defer></script>
+</body>
+</html>

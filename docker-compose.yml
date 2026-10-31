@@ -1,0 +1,31 @@
+# Paste this into Portainer: Stacks > Add stack > Web editor.
+# Add ADMIN_TOKEN under "Environment variables" (a long random string).
+services:
+  artcraft-hub:
+    image: ghcr.io/cj0206/artcraftweb:latest
+    # No registry? Use a Git repository stack in Portainer and swap the line above for:
+    # build: .
+    container_name: artcraft-hub
+    init: true
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?Set ADMIN_TOKEN to a long random string}
+      UPDATE_INTERVAL_HOURS: "6"
+      # GITHUB_TOKEN: ""            # optional, raises GitHub's API rate limit
+      # CROSS_ORIGIN_ISOLATION: "1" # only if an app needs multi-threaded WebAssembly
+    volumes:
+      - portainer/Files/AppData/Config/artcraftweb:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+
+volumes:
+  artcraft-data:
