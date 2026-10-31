@@ -17,7 +17,7 @@ services:
       # GITHUB_TOKEN: ""            # optional, raises GitHub's API rate limit
       # CROSS_ORIGIN_ISOLATION: "1" # only if an app needs multi-threaded WebAssembly
     volumes:
-      - /portainer/Files/AppData/Config/artcrafthub:/data
+      - /portainer/Files/AppData/Config/ArtCraftHub:/data
     read_only: true
     tmpfs:
       - /tmp
