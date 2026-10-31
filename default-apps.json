@@ -3,6 +3,6 @@
   { "id": "gridcraft",   "name": "GridCraft",   "repo": "storytold/gridcraft",   "category": "Office",       "description": "Spreadsheets." },
   { "id": "deckcraft",   "name": "DeckCraft",   "repo": "storytold/deckcraft",   "category": "Office",       "description": "Presentations." },
   { "id": "pdfcraft",    "name": "PdfCraft",    "repo": "storytold/pdfcraft",    "category": "Productivity", "description": "Read, organise and protect PDFs." },
-  { "id": "designcraft", "name": "DesignCraft", "repo": "storytold/designcraft", "category": "Create",       "description": "Page layout and publishing." },
-  { "id": "photocraft",  "name": "PhotoCraft",  "repo": "storytold/photocraft",  "category": "Create",       "description": "Photo editing." }
+  { "id": "designcraft", "name": "DesignCraft", "repo": "storytold/designcraft", "category": "Creative",       "description": "Page layout and publishing." },
+  { "id": "photocraft",  "name": "PhotoCraft",  "repo": "storytold/photocraft",  "category": "Creative",       "description": "Photo editing." }
 ]
