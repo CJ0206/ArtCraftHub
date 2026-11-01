@@ -46,6 +46,16 @@
   </div>
 
   <main id="stage">
+    <div class="problem" id="problemBar" role="alert" hidden>
+      <div class="problem-text">
+        <strong id="problemTitle"></strong>
+        <span id="problemBody"></span>
+      </div>
+      <span class="notice-btns">
+        <button class="btn" id="problemReload" type="button">Reload this app</button>
+        <button class="btn ghost" id="problemDismiss" type="button">Dismiss</button>
+      </span>
+    </div>
     <section class="home" id="home" role="tabpanel" aria-labelledby="tab-home">
       <div class="home-inner">
         <h1>Open a tool</h1>
@@ -58,6 +68,7 @@
           <label><input type="checkbox" id="restorePref"> Reopen my tabs when I come back</label>
           <p class="note" id="storageNote"></p>
         </fieldset>
+        <p class="contact" id="contact" hidden></p>
       </div>
     </section>
     <div id="frames"></div>
@@ -75,24 +86,45 @@
         <li>Open and save files from each app’s own menus. Files come from and go to your device, and nothing is uploaded to this server.</li>
         <li>Save to a file often. Browser storage is not a backup, and a crash or cleared browser data can lose unsaved work.</li>
         <li>You are warned before closing the page while apps are open. You can turn that off, and tab restoring too, under Preferences on the Home tab.</li>
-        <li>When an app is updated, a banner offers to refresh. Save your work first, because refreshing restarts the open apps.</li>
+        <li>A banner offers a refresh when an app is added, updated or removed. Save your work first, because refreshing restarts the open apps.</li>
+        <li>A small arrow beside a version number means a newer version exists that the site owner has not installed yet.</li>
+      </ul>
+
+      <h3>If an app will not open or looks blank</h3>
+      <p>When an app cannot start, a red bar appears above it with the reason. Try these in order:</p>
+      <ol>
+        <li>Press <strong>Reload this app</strong> in the bar, or refresh the page.</li>
+        <li>Make sure the address starts with <code>https://</code>. Many browser features, including saving to your device and fast graphics, only work on secure pages.</li>
+        <li>Use an up-to-date Chrome, Edge, Firefox or Safari. These apps run as WebAssembly and need WebGL or WebGPU for graphics. Turn on hardware acceleration in your browser settings if it is off.</li>
+        <li>Close other tabs and apps, especially on phones and tablets. Each open app uses memory.</li>
+        <li>If the bar says a file is missing, the problem is in how the project packaged that release. The site owner can choose another version in Manage, and the project’s maintainers can fix it in their next release.</li>
+      </ol>
+
+      <h3>What the hub fixes on its own</h3>
+      <ul>
+        <li>It finds the web build even when a project names its files differently, and skips installers for Windows, macOS and Linux.</li>
+        <li>It checks every download before using it. If a file the app needs is in the wrong folder, it is moved into place.</li>
+        <li>If the newest release is broken, the hub keeps or installs the newest one that works, remembers the broken one so it is not downloaded again, and tells the owner why in Manage.</li>
+        <li>Sites built for the root of a domain have their main links adjusted so they load from here.</li>
+        <li>Icons are taken from the app itself, or from the project’s repository, and a lettered tile is used if none is found.</li>
+        <li>Routine log messages from apps are hidden so the browser console shows warnings and errors only.</li>
       </ul>
 
       <h3>Adding an app (site owner)</h3>
       <ol>
         <li>Press <strong>Manage</strong> and sign in with the admin token.</li>
-        <li>Under <strong>Add an app</strong>, enter the project’s GitHub address, such as <code>owner/name</code>.</li>
-        <li>Optionally choose a group (for example Office or Create) and write a short description, then press <strong>Add app</strong>.</li>
-        <li>The server finds the project’s latest GitHub release, downloads its web build, unpacks it and adds a tile. This usually takes under a minute, and the list shows progress or the reason it failed.</li>
-        <li>After that the server checks for new releases by itself and installs them. Visitors see a refresh banner when something changes.</li>
-        <li>In Manage you can also pick a <strong>colour for each group</strong>, edit an app, update it now, or remove it.</li>
+        <li>Under <strong>Add an app</strong>, enter the project’s GitHub address, such as <code>owner/name</code>. Optionally choose a group, a short description, a release file pattern or an icon address.</li>
+        <li>Press <strong>Add app</strong>. The server finds the project’s releases, downloads the newest web build that works, and adds a tile. This usually takes under a minute, and the list shows progress or the reason it failed.</li>
+        <li>After that the server checks for new releases by itself. Each app has an <strong>Update automatically</strong> switch. When it is off, the list shows that an update is available and you press <strong>Update</strong> when you are ready.</li>
+        <li>To stay on a particular version, choose it in the version list and press <strong>Pin</strong>. A pinned app never changes until you unpin it, but the list still tells you when something newer exists.</li>
+        <li>Under <strong>Groups</strong> you can rename a group, which moves every app in it, and choose its colour. Use <strong>Edit</strong> on an app to change its details.</li>
       </ol>
 
       <h3>What an app needs in order to work here</h3>
       <ul>
         <li>A public GitHub repository with a published Release. Tags on their own are not enough.</li>
-        <li>A release file that is a zip of a static website with an <code>index.html</code>. By default the file name must contain <code>-web-</code> and end in <code>.zip</code>. If a project names it differently, use Edit and set the release file pattern.</li>
-        <li>Links that work from a sub-folder. A site that only works at the root of a domain will not load.</li>
+        <li>A release file that is a zip of a static website with an <code>index.html</code>. The hub recognises the usual <code>-web-</code> name and other web-looking zips. If a project’s file is named differently, use Edit and set the release file pattern.</li>
+        <li>Links that work from a sub-folder. Sites that need to sit at the root of a domain may not load.</li>
         <li>A size under the limit, 400 MB unless the owner changed it.</li>
       </ul>
 
@@ -102,7 +134,7 @@
         <li>Private repositories are not supported. GitHub limits how often releases can be checked, and the owner can add a <code>GITHUB_TOKEN</code> to raise that.</li>
         <li>All apps share one web address and so share the browser’s storage. Only add projects you trust.</li>
         <li>Whether an app recovers unsaved work after a crash depends on the app. The hub only remembers which tabs were open.</li>
-        <li>Every open tab uses memory on the visitor’s device, so close tabs you are not using, especially on phones.</li>
+        <li>If every recent release of a project is broken, the app cannot be installed until the project publishes a fixed one.</li>
         <li>Saving to a file on the device needs a secure (HTTPS) connection in most browsers.</li>
       </ul>
     </div>
@@ -114,12 +146,15 @@
       <button class="btn ghost" id="manageClose" type="button">Close</button>
     </div>
     <div id="loginView">
-      <p>Enter the admin token set in the container’s <code>ADMIN_TOKEN</code> variable.</p>
-      <div class="row">
-        <input id="tokenInput" type="password" autocomplete="off" aria-label="Admin token" placeholder="Admin token">
-        <button class="btn solid" id="loginBtn" type="button">Sign in</button>
-      </div>
-      <p class="err" id="loginErr" role="alert"></p>
+      <form id="loginForm" autocomplete="off" novalidate>
+        <p>Enter the admin token set in the container’s <code>ADMIN_TOKEN</code> variable.</p>
+        <input class="sr-only" type="text" name="username" autocomplete="username" value="admin" tabindex="-1" aria-hidden="true">
+        <div class="row">
+          <input id="tokenInput" type="password" autocomplete="off" aria-label="Admin token" placeholder="Admin token">
+          <button class="btn solid" id="loginBtn" type="submit">Sign in</button>
+        </div>
+        <p class="err" id="loginErr" role="alert"></p>
+      </form>
     </div>
     <div id="adminView" hidden>
       <div class="row spread">
@@ -130,25 +165,40 @@
           <button class="btn ghost" id="logoutBtn" type="button">Sign out</button>
         </div>
       </div>
+
+      <h3 id="appsHeading">Apps</h3>
       <ul class="applist" id="adminList"></ul>
 
-      <h3>Group colours</h3>
-      <p class="note">Pick the colour shown for each group on the home page and its tabs.</p>
+      <h3>Groups</h3>
+      <p class="note">Rename a group to move every app in it, or pick its colour.</p>
       <div class="cats" id="catEditor"></div>
 
-      <h3 id="formTitle">Add an app</h3>
-      <div class="form" id="addForm">
-        <label>GitHub repository<input id="fRepo" placeholder="owner/name or https://github.com/owner/name"></label>
-        <label>Name<input id="fName" placeholder="Shown on the card"></label>
-        <label>Group<input id="fCat" placeholder="Office, Create, Other…" list="catList"></label>
-        <datalist id="catList"></datalist>
-        <label class="wide">Description<input id="fDesc" placeholder="One short line"></label>
-        <label class="wide">Release file pattern <span class="hint">(optional)</span><input id="fPattern" placeholder="-web-.*\.zip$"></label>
-        <div class="row wide">
-          <button class="btn solid" id="saveAppBtn" type="button">Add app</button>
-          <button class="btn ghost" id="cancelEditBtn" type="button" hidden>Cancel edit</button>
+      <section id="appForm">
+        <h3 id="formTitle">Add an app</h3>
+        <div class="form" id="addForm">
+          <label>GitHub repository<input id="fRepo" placeholder="owner/name or https://github.com/owner/name"></label>
+          <label>Name<input id="fName" placeholder="Shown on the card"></label>
+          <label>Group<input id="fCat" placeholder="Office, Create, Other…" list="catList"></label>
+          <datalist id="catList"></datalist>
+          <label>Description<input id="fDesc" placeholder="One short line"></label>
+          <label>Release file pattern <span class="hint">(optional)</span><input id="fPattern" placeholder="-web-.*\.zip$"></label>
+          <label>Icon address <span class="hint">(optional, https)</span><input id="fIcon" placeholder="Used if no icon is found automatically"></label>
+          <div class="row wide">
+            <button class="btn solid" id="saveAppBtn" type="button">Add app</button>
+            <button class="btn ghost" id="cancelEditBtn" type="button" hidden>Cancel edit</button>
+          </div>
+          <p class="err wide" id="formErr" role="alert"></p>
         </div>
-        <p class="err wide" id="formErr" role="alert"></p>
+      </section>
+
+      <h3>Home page footer</h3>
+      <p class="note">Off by default. When on, the contact is shown at the bottom of the home page for everyone.</p>
+      <div class="form" id="siteForm">
+        <label class="wide check"><input type="checkbox" id="sContactOn"> Show contact details on the home page</label>
+        <label>Email or web address<input id="sContact" placeholder="you@example.com or https://example.com/contact"></label>
+        <label>Text before it <span class="hint">(optional)</span><input id="sLabel" placeholder="Questions or problems? Contact"></label>
+        <div class="row wide"><button class="btn solid" id="saveSiteBtn" type="button">Save footer</button></div>
+        <p class="err wide" id="siteErr" role="alert"></p>
       </div>
     </div>
   </dialog>

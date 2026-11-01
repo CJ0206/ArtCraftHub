@@ -179,3 +179,38 @@ input[type="color"] { width: 2.4rem; height: 2rem; padding: 2px; background: var
   .prefs label { padding: .5rem 0; }
 }
 @media (prefers-reduced-motion: reduce) { .toast, .tile { transition: none; } .tile:active { transform: none; } }
+
+/* ---------- additions: problems, update badges, admin controls, footer ---------- */
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); border: 0; white-space: nowrap; }
+
+.problem { position: absolute; z-index: 5; top: 0; left: 0; right: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem 1rem; padding: .7rem max(1rem, env(safe-area-inset-left)); background: var(--raised); border-bottom: 2px solid var(--danger); box-shadow: 0 6px 20px rgba(0, 0, 0, .25); }
+.problem[hidden] { display: none; }
+.problem-text { display: grid; gap: .15rem; min-width: 0; flex: 1 1 22rem; }
+.problem-text strong { color: var(--danger); }
+.problem-text span { color: var(--text); font-size: .93rem; overflow-wrap: anywhere; }
+
+.tile .upd { display: inline-flex; align-items: center; gap: .25rem; margin-left: .5rem; color: var(--accent); font-weight: 600; }
+.tile .upd svg { width: .95em; height: .95em; }
+
+.chip { display: inline-flex; align-items: center; gap: .3rem; padding: .08rem .55rem; border-radius: 999px; font: 600 .75rem var(--sans); border: 1px solid var(--line); background: var(--raised-2); color: var(--muted); white-space: nowrap; }
+.chip.upd { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.chip.pin { color: var(--text); }
+.chip.warn { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 55%, transparent); }
+.applist .nm .vers { font: 500 .8rem var(--sans); color: var(--muted); }
+.applist .chips { display: flex; flex-wrap: wrap; gap: .35rem; }
+.applist .warnline { color: var(--danger); font-size: .85rem; overflow-wrap: anywhere; }
+.applist .controls { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1.1rem; margin-top: .35rem; padding-top: .5rem; border-top: 1px solid var(--line); }
+.applist .controls label { display: flex; align-items: center; gap: .5rem; cursor: pointer; font-size: .9rem; }
+.applist .controls select { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: .45rem; padding: .3rem .5rem; max-width: 14rem; }
+.applist .verpick { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; font-size: .9rem; color: var(--muted); }
+
+.catrow input.rename { flex: 1 1 9rem; min-width: 7rem; width: auto; padding: .35rem .6rem; }
+.catrow .nm { min-width: 0; }
+.form label.check { display: flex; align-items: center; gap: .6rem; color: var(--text); font-size: .95rem; cursor: pointer; }
+#appForm { scroll-margin-top: 4rem; }
+#appForm.flash .form { outline: 2px solid var(--accent); outline-offset: 6px; border-radius: .5rem; }
+
+.contact { margin: 1.4rem 0 0; color: var(--muted); font-size: .92rem; }
+.contact a { color: var(--accent); text-underline-offset: 2px; }
+
+@media (max-width: 760px) { .problem { padding-top: .6rem; } }

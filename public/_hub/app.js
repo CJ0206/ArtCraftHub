@@ -19,8 +19,18 @@
     for (const kid of kids.flat()) if (kid != null) el.append(kid);
     return el;
   }
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  function arrowIcon() {
+    const s = document.createElementNS(SVG_NS, 'svg');
+    s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('aria-hidden', 'true');
+    const p = document.createElementNS(SVG_NS, 'path');
+    for (const [k, v] of Object.entries({ d: 'M12 19V6m0 0l-5 5m5-5l5 5', fill: 'none', stroke: 'currentColor', 'stroke-width': '2.4', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })) p.setAttribute(k, v);
+    s.append(p);
+    return s;
+  }
   const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
   const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+  const smooth = () => ({ behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
   let toastTimer;
   function toast(msg) {
     const t = $('#toast'); t.textContent = msg; t.classList.add('show');
@@ -30,9 +40,11 @@
   // ---------- state ----------
   let apps = [];
   let categories = {};         // group name -> colour chosen by the owner
+  let site = { contact: null };
   let openIds = [];            // tab order
   let active = 'home';
   const frames = new Map();    // id -> iframe (created lazily, kept alive while the tab is open)
+  const problems = new Map();  // id -> { text } for apps that failed to start
   const appById = (id) => apps.find((a) => a.id === id);
 
   // ---------- group colours ----------
@@ -120,9 +132,10 @@
     lastPoll = Date.now();
     apps = data.apps || [];
     categories = data.categories || {};
+    site = data.site || { contact: null };
     checkForChanges();
-    const sig = JSON.stringify([apps, categories]);
-    if (sig !== lastSig) { lastSig = sig; renderHome(); renderTabs(); }
+    const sig = JSON.stringify([apps, categories, site]);
+    if (sig !== lastSig) { lastSig = sig; renderHome(); renderTabs(); renderContact(); }
     return true;
   }
   setInterval(() => { if (!document.hidden) loadApps(); }, 5 * 60 * 1000);
@@ -150,10 +163,22 @@
         h('div', { class: 'tiles' }, groups.get(cat).map(tile))), cat)));
   }
 
+  function renderContact() {
+    const el = $('#contact');
+    const c = site && site.contact;
+    if (!c || !c.value) { el.hidden = true; return; }
+    const shown = c.kind === 'url' ? c.value.replace(/^https?:\/\//, '').replace(/\/$/, '') : c.value;
+    const link = c.kind === 'email'
+      ? h('a', { href: `mailto:${c.value}` }, shown)
+      : c.kind === 'url' ? h('a', { href: c.value, target: '_blank', rel: 'noopener noreferrer' }, shown) : shown;
+    el.replaceChildren(`${c.label || 'Questions or problems? Contact'} `, link);
+    el.hidden = false;
+  }
+
   function tile(a) {
     const letter = h('span', { class: 'ico letter', 'aria-hidden': 'true', text: a.name.slice(0, 1).toUpperCase() });
     const icon = a.icon
-      ? h('img', { class: 'ico', src: `/icons/${a.id}.png`, alt: '', width: 64, height: 64, onerror(e) { e.target.replaceWith(letter); } })
+      ? h('img', { class: 'ico', src: `/icons/${a.id}?v=${a.iconV || 0}`, alt: '', width: 64, height: 64, onerror(e) { e.target.replaceWith(letter); } })
       : letter;
     const isOpen = openIds.includes(a.id);
     return h('button', { class: 'tile', type: 'button', onclick: () => openApp(a.id) },
@@ -161,7 +186,10 @@
       h('span', {},
         h('span', { class: 'name', text: a.name }),
         a.description ? h('span', { class: 'desc', text: a.description }) : null,
-        h('span', { class: 'ver' }, a.version ? `Version ${a.version}` : '', isOpen ? h('span', { class: 'open-pill', text: 'Open in a tab' }) : null)));
+        h('span', { class: 'ver' },
+          a.version ? `Version ${a.version}` : '',
+          a.updateAvailable ? h('span', { class: 'upd', title: `A newer version (${a.latest}) is available. The site owner hasn’t installed it yet.` }, arrowIcon(), 'Update available') : null,
+          isOpen ? h('span', { class: 'open-pill', text: 'Open in a tab' }) : null)));
   }
 
   // ---------- tabs ----------
@@ -199,14 +227,80 @@
     if (n) { e.preventDefault(); activate(n); $(`#tab-${n}`)?.focus(); }
   }
 
+  // ---------- why an app failed to start ----------
+  const IGNORED_ERRORS = /(ResizeObserver|^Script error\.?$|Non-Error promise rejection)/i;
+
+  function looksAlive(f) {
+    try {
+      const d = f.contentDocument;
+      const c = d.querySelector('canvas');
+      if (c && c.width > 0 && c.height > 0) return true;
+      return ((d.body && d.body.innerText) || '').trim().length > 20;
+    } catch { return true; } // can't inspect it, so don't claim it failed
+  }
+
+  function setProblem(id, text) {
+    if (problems.has(id)) return;
+    problems.set(id, { text });
+    if (active === id) renderProblem();
+  }
+  function renderProblem() {
+    const bar = $('#problemBar');
+    const p = problems.get(active);
+    if (active === 'home' || !p) { bar.hidden = true; return; }
+    const a = appById(active);
+    $('#problemTitle').textContent = `${a ? a.name : 'This app'} couldn’t start properly.`;
+    $('#problemBody').textContent = p.text;
+    bar.hidden = false;
+  }
+  $('#problemDismiss').addEventListener('click', () => { problems.delete(active); renderProblem(); });
+  $('#problemReload').addEventListener('click', () => {
+    const f = frames.get(active);
+    problems.delete(active); renderProblem();
+    if (f) { try { f.contentWindow.location.reload(); } catch { f.src = f.src; } }
+  });
+
+  function onFrameLoad(id, f) {
+    const openedAt = Date.now();
+    const errors = [];
+    try {
+      const w = f.contentWindow;
+      w.addEventListener('error', (e) => { if (e.message && !IGNORED_ERRORS.test(e.message)) errors.push(e.message); });
+      w.addEventListener('unhandledrejection', (e) => {
+        const m = e.reason && (e.reason.message || String(e.reason));
+        if (m && !IGNORED_ERRORS.test(m)) errors.push(m);
+      });
+    } catch { /* not inspectable */ }
+    const check = async () => {
+      if (frames.get(id) !== f) return;
+      try {
+        const res = await fetch(`/api/apps/${id}/problems`, { cache: 'no-store' });
+        const data = await res.json();
+        const recent = (data.missing || []).filter((m) => m.ageSec <= (Date.now() - openedAt) / 1000 + 3);
+        if (recent.length) {
+          const more = recent.length > 1 ? ` and ${recent.length - 1} more` : '';
+          setProblem(id, `It asked for a file this server doesn’t have: ${recent[0].path}${more}. That is a packaging problem in this release of the app, not something wrong with your device. The site owner can choose another version in Manage.`);
+          return;
+        }
+      } catch { /* offline: fall through to the error check */ }
+      if (errors.length && !looksAlive(f)) {
+        setProblem(id, `The app reported an error while starting: ${errors[0].slice(0, 200)}. Try Reload this app, and make sure the page is using HTTPS.`);
+      }
+    };
+    setTimeout(check, 2500);
+    setTimeout(check, 9000);
+  }
+
   // ---------- opening, switching, closing ----------
   function makeFrame(a) {
     const f = h('iframe', {
-      class: 'frame', id: `frame-${a.id}`, title: a.name, src: `/apps/${a.id}/`,
-      allow: 'clipboard-read; clipboard-write; fullscreen; autoplay; encrypted-media',
-      allowfullscreen: true, 'data-id': a.id,
+      class: 'frame', id: `frame-${a.id}`, title: a.name,
+      allow: 'clipboard-read; clipboard-write; fullscreen; autoplay; encrypted-media', 'data-id': a.id,
     });
+    f.addEventListener('load', () => { if (f.getAttribute('src')) onFrameLoad(a.id, f); });
     frames.set(a.id, f); $('#frames').append(f);
+    // Start loading on the next frame so the click that opened the tab returns immediately.
+    requestAnimationFrame(() => { f.setAttribute('src', `/apps/${a.id}/`); });
     return f;
   }
 
@@ -230,7 +324,7 @@
       document.title = 'ArtCraft Hub';
       loadApps();
     }
-    renderTabs(); saveSession();
+    renderTabs(); renderProblem(); saveSession();
   }
 
   function openApp(id) {
@@ -243,7 +337,7 @@
     if (frames.has(id) && !confirm(`Close ${a ? a.name : 'this tab'}?\n\nAnything you haven’t saved to your device will be lost.`)) return;
     const idx = openIds.indexOf(id);
     openIds = openIds.filter((x) => x !== id);
-    frames.get(id)?.remove(); frames.delete(id);
+    frames.get(id)?.remove(); frames.delete(id); problems.delete(id);
     if (active === id) activate(openIds[Math.min(idx, openIds.length - 1)] || 'home');
     else { renderTabs(); saveSession(); }
   }
@@ -302,8 +396,8 @@
   $('#manageClose').addEventListener('click', () => dlg.close());
   $('#howBtn').addEventListener('click', () => $('#helpDlg').showModal());
   dlg.addEventListener('close', () => { clearInterval(pollTimer); pollTimer = null; loadApps(); });
-  $('#tokenInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#loginBtn').click(); });
-  $('#loginBtn').addEventListener('click', async () => {
+  $('#loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
     token = $('#tokenInput').value; $('#tokenInput').value = ''; $('#loginErr').textContent = '';
     if (!token) return;
     try { await refreshAdmin(); }
@@ -317,33 +411,61 @@
     lastAdminList = data.apps;
     showAdmin(true);
     $('#adminNote').textContent = data.intervalHours > 0
-      ? `Apps check GitHub for new releases every ${data.intervalHours} hours.`
-      : 'Automatic update checks are turned off.';
+      ? `Checks GitHub for new releases every ${data.intervalHours} hours, for apps with automatic updates on.`
+      : 'Automatic update checks are turned off for this server.';
     renderAdminList(data.apps);
     renderCategoryEditor(data.apps);
+    fillSiteForm(data.settings || {});
     $('#catList').replaceChildren(...catOrder(new Set(['Office', 'Create', 'Other', ...data.apps.map((a) => a.category).filter(Boolean)])).map((c) => h('option', { value: c })));
     const busy = data.apps.some((a) => a.installing);
     if (busy && !pollTimer) pollTimer = setInterval(() => refreshAdmin().catch(() => {}), 3000);
     if (!busy && pollTimer) { clearInterval(pollTimer); pollTimer = null; }
   }
 
-  function renderAdminList(list) {
-    $('#adminList').replaceChildren(...list.map((a) => {
-      let status;
-      if (a.installing) status = h('span', { class: 'meta', text: 'Downloading and installing…' });
-      else if (a.error) status = h('span', { class: 'bad', text: a.error });
-      else if (a.installed) status = h('span', { class: 'meta', text: `Version ${a.version}, installed ${fmtDate(a.updatedAt)}, last checked ${fmtDate(a.checkedAt)}` });
-      else status = h('span', { class: 'meta', text: 'Waiting for the first install…' });
-      return paint(h('li', {},
-        h('div', { class: 'top' },
-          h('span', { class: 'nm' }, h('span', { class: 'dot' }), a.name),
-          h('span', { class: 'btns' },
-            h('button', { class: 'btn', type: 'button', onclick: () => updateOne(a) }, 'Update now'),
-            h('button', { class: 'btn', type: 'button', onclick: () => editApp(a) }, 'Edit'),
-            h('button', { class: 'btn danger', type: 'button', onclick: () => removeApp(a) }, 'Remove'))),
-        h('span', { class: 'meta', text: `${a.repo} · group: ${a.category}` }),
-        status), a.category);
-    }));
+  const chip = (text, cls, icon) => h('span', { class: `chip ${cls}` }, icon || null, text);
+
+  function appCard(a) {
+    let status;
+    if (a.installing) status = h('span', { class: 'meta', text: 'Downloading and installing…' });
+    else if (a.error) status = h('span', { class: 'bad', text: a.error });
+    else if (a.installed) status = h('span', { class: 'meta', text: `Installed ${fmtDate(a.updatedAt)}, last checked ${fmtDate(a.checkedAt)}` });
+    else status = h('span', { class: 'meta', text: 'Waiting for the first install…' });
+
+    const chips = [];
+    if (a.pin) chips.push(chip(`Pinned to ${a.pin}`, 'pin'));
+    if (a.updateAvailable) chips.push(chip(`Update available: ${a.latest}`, 'upd', arrowIcon()));
+    else if (a.latest && a.version && a.latest !== a.version && a.badTags.includes(a.latest)) chips.push(chip(`Newest (${a.latest}) can’t run here`, 'warn'));
+    if (!a.autoUpdate && !a.pin) chips.push(chip('Manual updates', ''));
+
+    const tags = a.releases.map((r) => r.tag);
+    if (a.pin && !tags.includes(a.pin)) tags.unshift(a.pin);
+    const select = h('select', { 'aria-label': `Version of ${a.name}`, disabled: !tags.length },
+      tags.map((t) => h('option', { value: t, selected: t === (a.pin || a.version) },
+        `${t}${t === a.version ? ' (installed)' : ''}${a.badTags.includes(t) ? ' (can’t run here)' : ''}`)));
+    const auto = h('input', { type: 'checkbox', checked: a.autoUpdate && !a.pin, disabled: Boolean(a.pin), onchange: (e) => postSettings(a, { autoUpdate: e.target.checked }, `Automatic updates ${e.target.checked ? 'on' : 'off'} for ${a.name}.`) });
+
+    return paint(h('li', {},
+      h('div', { class: 'top' },
+        h('span', { class: 'nm' }, h('span', { class: 'dot' }), a.name, a.version ? h('span', { class: 'vers', text: a.version }) : null),
+        h('span', { class: 'btns' },
+          h('button', { class: a.updateAvailable && !a.pin ? 'btn solid' : 'btn', type: 'button', onclick: () => updateOne(a) }, a.updateAvailable && !a.pin ? `Update to ${a.latest}` : 'Check now'),
+          h('button', { class: 'btn', type: 'button', onclick: () => editApp(a) }, 'Edit'),
+          h('button', { class: 'btn danger', type: 'button', onclick: () => removeApp(a) }, 'Remove'))),
+      chips.length ? h('div', { class: 'chips' }, chips) : null,
+      h('span', { class: 'meta', text: `${a.repo} · group: ${a.category}` }),
+      status,
+      a.warning ? h('span', { class: 'warnline', text: a.warning }) : null,
+      h('div', { class: 'controls' },
+        h('label', { title: a.pin ? 'A pinned app never changes until you unpin it.' : '' }, auto, 'Update automatically'),
+        h('span', { class: 'verpick' }, 'Version', select,
+          h('button', { class: 'btn', type: 'button', disabled: !tags.length, onclick: () => postSettings(a, { pin: a.pin ? null : select.value }, a.pin ? `Unpinned ${a.name}.` : `Pinning ${a.name} to ${select.value}…`) }, a.pin ? 'Unpin' : 'Pin this version')))), a.category);
+  }
+  function renderAdminList(list) { $('#adminList').replaceChildren(...list.map(appCard)); }
+
+  async function postSettings(a, body, message) {
+    try { await api(`/api/admin/apps/${a.id}/settings`, { method: 'POST', body: JSON.stringify(body) }); toast(message); }
+    catch (e) { toast(e.message); }
+    await refreshAdmin().catch(() => {});
   }
 
   function renderCategoryEditor(list) {
@@ -356,11 +478,26 @@
         return b;
       });
       const picker = h('input', { type: 'color', 'aria-label': `Custom colour for ${name}`, value: current.startsWith('#') ? current : '#8fa5ff', onchange: (e) => setCategoryColour(name, e.target.value) });
+      const input = h('input', { class: 'rename', type: 'text', maxlength: '30', value: name, 'aria-label': `Rename the ${name} group`, onkeydown: (e) => { if (e.key === 'Enter') renameGroup(name, input.value); } });
       return paint(h('div', { class: 'catrow' },
-        h('span', { class: 'nm' }, h('span', { class: 'dot' }), name),
+        h('span', { class: 'nm' }, h('span', { class: 'dot' })),
+        input,
+        h('button', { class: 'btn', type: 'button', onclick: () => renameGroup(name, input.value) }, 'Rename'),
         h('span', { class: 'swatches' }, swatches, picker),
-        h('button', { class: 'btn ghost', type: 'button', onclick: () => setCategoryColour(name, '') }, 'Reset')), name);
+        h('button', { class: 'btn ghost', type: 'button', onclick: () => setCategoryColour(name, '') }, 'Reset colour')), name);
     }));
+  }
+
+  async function renameGroup(from, to) {
+    to = (to || '').trim();
+    if (!to || to === from) return;
+    const exists = lastAdminList.some((a) => (a.category || 'Other') === to);
+    if (exists && !confirm(`There is already a group called “${to}”. Move the apps from “${from}” into it?`)) return;
+    try {
+      await api('/api/admin/categories/rename', { method: 'POST', body: JSON.stringify({ from, to }) });
+      toast(`Renamed ${from} to ${to}.`);
+      await refreshAdmin(); lastSig = ''; await loadApps();
+    } catch (e) { toast(e.message); }
   }
 
   async function setCategoryColour(name, colour) {
@@ -374,7 +511,7 @@
   }
 
   async function updateOne(a) {
-    try { await api(`/api/admin/apps/${a.id}/update`, { method: 'POST', body: '{}' }); toast(`Updating ${a.name}…`); await refreshAdmin(); }
+    try { await api(`/api/admin/apps/${a.id}/update`, { method: 'POST', body: '{}' }); toast(`Checking ${a.name}…`); await refreshAdmin(); }
     catch (e) { toast(e.message); }
   }
   async function removeApp(a) {
@@ -385,16 +522,22 @@
       toast(`Removed ${a.name}.`); await refreshAdmin();
     } catch (e) { toast(e.message); }
   }
+
+  // Edit takes you straight to the form, filled in.
   function editApp(a) {
     editingId = a.id;
     $('#fRepo').value = a.repo; $('#fName').value = a.name; $('#fCat').value = a.category || '';
-    $('#fDesc').value = a.description || ''; $('#fPattern').value = a.assetPattern || '';
-    $('#formTitle').textContent = `Edit ${a.name}`; $('#saveAppBtn').textContent = 'Save and reinstall';
-    $('#cancelEditBtn').hidden = false; $('#fRepo').focus();
+    $('#fDesc').value = a.description || ''; $('#fPattern').value = a.assetPattern || ''; $('#fIcon').value = a.iconUrl || '';
+    $('#formTitle').textContent = `Edit ${a.name}`; $('#saveAppBtn').textContent = 'Save changes';
+    $('#cancelEditBtn').hidden = false; $('#formErr').textContent = '';
+    const section = $('#appForm');
+    section.scrollIntoView(smooth());
+    section.classList.add('flash'); setTimeout(() => section.classList.remove('flash'), 1600);
+    $('#fRepo').focus({ preventScroll: true });
   }
   function resetForm() {
     editingId = null;
-    for (const id of ['fRepo', 'fName', 'fCat', 'fDesc', 'fPattern']) $('#' + id).value = '';
+    for (const id of ['fRepo', 'fName', 'fCat', 'fDesc', 'fPattern', 'fIcon']) $('#' + id).value = '';
     $('#formTitle').textContent = 'Add an app'; $('#saveAppBtn').textContent = 'Add app';
     $('#cancelEditBtn').hidden = true; $('#formErr').textContent = '';
   }
@@ -403,17 +546,33 @@
     $('#formErr').textContent = '';
     const body = {
       id: editingId || undefined, repo: $('#fRepo').value, name: $('#fName').value, category: $('#fCat').value,
-      description: $('#fDesc').value, assetPattern: $('#fPattern').value,
+      description: $('#fDesc').value, assetPattern: $('#fPattern').value, iconUrl: $('#fIcon').value,
     };
     try {
       await api('/api/admin/apps', { method: 'POST', body: JSON.stringify(body) });
-      toast(editingId ? 'Saved. Reinstalling…' : 'Added. Downloading the latest release…');
+      toast(editingId ? 'Saved.' : 'Added. Downloading the newest working release…');
       resetForm(); await refreshAdmin();
+      $('#appsHeading').scrollIntoView(smooth());
     } catch (e) { $('#formErr').textContent = e.message; }
   });
   $('#checkAllBtn').addEventListener('click', async () => {
     try { await api('/api/admin/check', { method: 'POST', body: '{}' }); toast('Checking every app for updates…'); setTimeout(() => refreshAdmin().catch(() => {}), 1500); }
     catch (e) { toast(e.message); }
+  });
+
+  // ---------- home page footer settings ----------
+  function fillSiteForm(s) {
+    if (document.activeElement && document.activeElement.closest && document.activeElement.closest('#siteForm')) return; // don't overwrite typing
+    $('#sContactOn').checked = Boolean(s.contactEnabled);
+    $('#sContact').value = s.contact || '';
+    $('#sLabel').value = s.contactLabel || '';
+  }
+  $('#saveSiteBtn').addEventListener('click', async () => {
+    $('#siteErr').textContent = '';
+    try {
+      await api('/api/admin/settings', { method: 'PUT', body: JSON.stringify({ contactEnabled: $('#sContactOn').checked, contact: $('#sContact').value, contactLabel: $('#sLabel').value }) });
+      toast('Footer saved.'); lastSig = ''; await loadApps();
+    } catch (e) { $('#siteErr').textContent = e.message; }
   });
 
   // ---------- start ----------
