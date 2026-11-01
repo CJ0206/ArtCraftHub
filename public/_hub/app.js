@@ -74,7 +74,7 @@
   // ---------- theme ----------
   function applyTheme(t) {
     document.documentElement.dataset.theme = t;
-    const next = t === 'dark' ? 'Light theme' : 'Dark theme';
+    const next = t === 'dark' ? '' : '';
     $('#themeLbl').textContent = next;
     $('#themeBtn').setAttribute('aria-label', `Switch to ${next.toLowerCase()}`);
     $('#themeBtn').title = `Switch to ${next.toLowerCase()}`;
