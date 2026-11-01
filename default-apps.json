@@ -34,14 +34,14 @@
     "id": "designcraft",
     "name": "DesignCraft",
     "repo": "storytold/designcraft",
-    "category": "Create",
+    "category": "Creative",
     "description": "Page layout and publishing."
   },
   {
     "id": "photocraft",
     "name": "PhotoCraft",
     "repo": "storytold/photocraft",
-    "category": "Create",
+    "category": "Creative",
     "description": "Photo editing."
   }
 ]
