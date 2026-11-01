@@ -1,5 +1,5 @@
 [
-  { "id": "wordcraft",   "name": "WordCraft",   "repo": "storytold/wordcraft",   "category": "Office",       "description": "Word processor. Opens and saves .docx, .odt, .rtf and more, and exports PDF." },
+  { "id": "wordcraft",   "name": "WordCraft",   "repo": "storytold/wordcraft",   "category": "Office",       "description": "Word processor." },
   { "id": "gridcraft",   "name": "GridCraft",   "repo": "storytold/gridcraft",   "category": "Office",       "description": "Spreadsheets." },
   { "id": "deckcraft",   "name": "DeckCraft",   "repo": "storytold/deckcraft",   "category": "Office",       "description": "Presentations." },
   { "id": "pdfcraft",    "name": "PdfCraft",    "repo": "storytold/pdfcraft",    "category": "Productivity", "description": "Read, organise and protect PDFs." },
