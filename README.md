@@ -96,7 +96,7 @@ In **Manage**, enter a GitHub repository such as `storytold/photocraft`, optiona
 
 **Groups.** Rename a group in Manage → Groups to move every app in it, and pick its colour. **Home page footer** is off by default; when switched on it shows your email or web address at the bottom of the home page.
 
-If something fails, the in-app **Help** button lists what visitors can try, and the app card in Manage shows the reason.
+If something fails, the in-app **Help** button lists what visitors can try, and the app card in Manage shows the reason. The red bar above a failed app appears only when a file the app cannot run without (a script, WebAssembly or one of its parts) is missing. Optional files that apps ask for and can live without, such as extra fonts or manifests, are ignored.
 
 ## Icons and fonts
 

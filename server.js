@@ -586,9 +586,12 @@ async function checkAll() {
 // ---------- launch diagnostics ----------
 // Files an app asked for that this server doesn't have, so the page can say why it failed.
 const missingLog = new Map(); // id -> [{path, at}]
-const IGNORED_MISSING = /(\.map$|favicon\.ico$|robots\.txt$|apple-touch-icon|\.well-known\/|\/sw\.js$)/i;
+// Only files an app cannot run without count: scripts, WebAssembly and its parts. Apps ask for
+// plenty of optional files (extra fonts, manifests, icons, translations) and carry on without them.
+const ESSENTIAL_MISSING = /(\.m?js|\.wasm|\.part-[a-z0-9]+|(^|\/)parts\.txt|(^|\/)index\.html)$/i;
+const IGNORED_MISSING = /(\.map$|\/sw\.js$|service-?worker|(^|\/)sw\.js$)/i;
 function noteMissing(id, rel) {
-  if (IGNORED_MISSING.test(rel)) return;
+  if (!ESSENTIAL_MISSING.test(rel) || IGNORED_MISSING.test(rel)) return;
   const list = missingLog.get(id) || [];
   const hit = list.find((m) => m.path === rel);
   if (hit) hit.at = Date.now(); else list.push({ path: rel, at: Date.now() });
