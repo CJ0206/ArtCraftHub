@@ -21,18 +21,18 @@
     </a>
     <div class="tabs" id="tabs" role="tablist" aria-label="Open apps"></div>
     <div class="actions">
-      <button class="btn ghost" id="helpBtn" type="button" aria-label="Help and information">
+      <button class="btn ghost" id="helpBtn" type="button" aria-label="Help and information" title="Help and information">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="9.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9.4 9.4a2.7 2.7 0 1 1 3.9 2.4c-.9.5-1.3 1-1.3 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="17" r="1.1" fill="currentColor"/></svg>
-        <span class="lbl"></span>
+        <span class="lbl">Help</span>
       </button>
       <button class="btn ghost" id="themeBtn" type="button">
         <svg class="i-sun" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
         <svg class="i-moon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M20 14.2A8.2 8.2 0 0 1 9.8 4 8.2 8.2 0 1 0 20 14.2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
         <span class="lbl" id="themeLbl"></span>
       </button>
-      <button class="btn ghost" id="manageBtn" type="button" aria-label="Manage apps">
+      <button class="btn ghost" id="manageBtn" type="button" aria-label="Manage apps" title="Manage apps">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="15" cy="7" r="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="17" r="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
-        <span class="lbl"></span>
+        <span class="lbl">Manage</span>
       </button>
     </div>
   </header>
@@ -58,19 +58,32 @@
     </div>
     <section class="home" id="home" role="tabpanel" aria-labelledby="tab-home">
       <div class="home-inner">
-        <p class="lede">Each app opens in its own tab. Switch between them without losing your place.</p>
+        <h1>Open a tool</h1>
+        <p class="lede">Pick an app to open it in a tab. Switch between tabs without losing your place.</p>
         <div id="groups" aria-live="polite"></div>
         <p class="privacy">Your files stay on your device. Opening and saving happens in your browser, and nothing is uploaded to this server.</p>
         <fieldset class="prefs">
           <legend>Preferences</legend>
           <label><input type="checkbox" id="warnPref"> Warn me before I close this page while apps are open</label>
           <label><input type="checkbox" id="restorePref"> Reopen my tabs when I come back</label>
+          <label><input type="checkbox" id="fitPref"> Fit apps to small screens, with zoom and move controls</label>
           <p class="note" id="storageNote"></p>
         </fieldset>
         <p class="contact" id="contact" hidden></p>
       </div>
     </section>
     <div id="frames"></div>
+    <div class="viewbar" id="viewbar" role="toolbar" aria-label="View controls" hidden>
+      <span class="vb-controls" id="vbControls">
+        <button id="vbOut" type="button" aria-label="Zoom out" title="Zoom out">&minus;</button>
+        <button id="vbFit" type="button" aria-label="Fit to screen" title="Fit to screen"><span id="vbLabel">100%</span></button>
+        <button id="vbIn" type="button" aria-label="Zoom in" title="Zoom in">+</button>
+        <button id="vbPan" type="button" aria-pressed="false">Move view</button>
+      </span>
+      <button id="vbToggle" type="button" aria-expanded="true" aria-label="Hide view controls" title="Hide view controls">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
   </main>
 
   <dialog id="helpDlg" aria-labelledby="helpTitle">
@@ -87,6 +100,14 @@
         <li>You are warned before closing the page while apps are open. You can turn that off, and tab restoring too, under Preferences on the Home tab.</li>
         <li>A banner offers a refresh when an app is added, updated or removed. Save your work first, because refreshing restarts the open apps.</li>
         <li>A small arrow beside a version number means a newer version exists that the site owner has not installed yet.</li>
+      </ul>
+
+      <h3>Using the apps on a phone or tablet</h3>
+      <ul>
+        <li>These are full desktop-style apps, so on a small screen they are shown at a larger virtual size, scaled down so the whole window fits. Landscape and tablets give the most room.</li>
+        <li>Use the controls at the bottom right: <strong>+</strong> and <strong>&minus;</strong> zoom in and out, the percentage button fits the app back to your screen, and the corner button hides the controls.</li>
+        <li>When zoomed in, press <strong>Move view</strong> and drag to look around, then press <strong>Use app</strong> to go back to touching the app itself.</li>
+        <li>Prefer the app at its normal size? Turn off <strong>Fit apps to small screens</strong> under Preferences on the Home tab.</li>
       </ul>
 
       <h3>If an app will not open or looks blank</h3>

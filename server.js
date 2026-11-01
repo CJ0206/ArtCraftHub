@@ -70,8 +70,10 @@ async function loadDefaults() {
     id: d.id, repo: normaliseRepo(d.repo), name: cleanText(d.name, 60) || d.id,
     category: cleanText(d.category, 30) || 'Other', description: cleanText(d.description, 160),
     assetPattern: d.assetPattern ? cleanText(d.assetPattern, 120) : undefined,
+    oldDescriptions: Array.isArray(d.oldDescriptions) ? d.oldDescriptions.map((x) => cleanText(x, 160)) : [],
   }));
 }
+const withoutHistory = ({ oldDescriptions, ...app }) => app; // oldDescriptions only drives the migration below
 
 async function init() {
   await fsp.mkdir(APPS_DIR, { recursive: true });
@@ -79,7 +81,7 @@ async function init() {
   await fsp.mkdir(TMP_DIR, { recursive: true });
   const defaults = await loadDefaults();
   apps = await readJson(APPS_FILE, null);
-  if (!apps) { apps = defaults.map((d) => ({ ...d })); await saveApps(); }
+  if (!apps) { apps = defaults.map(withoutHistory); await saveApps(); }
   state = await readJson(STATE_FILE, {});
   categories = Object.assign(Object.create(null), await readJson(CATS_FILE, {}));
   settings = { ...settings, ...(await readJson(SETTINGS_FILE, {})) };
@@ -92,10 +94,19 @@ async function init() {
   for (const d of defaults) {
     if (seen.includes(d.id)) continue;
     seen.push(d.id);
-    if (!apps.some((a) => a.id === d.id)) { apps.push({ ...d }); added.push(d.name); }
+    if (!apps.some((a) => a.id === d.id)) { apps.push(withoutHistory(d)); added.push(d.name); }
   }
   if (added.length) { await saveApps(); log(`Added new default apps: ${added.join(', ')}`); }
   await writeJson(SEEN_FILE, seen);
+
+  // A shortened default description reaches installs that still have the old, unedited text.
+  // Descriptions the owner has changed are left alone.
+  let reworded = 0;
+  for (const d of defaults) {
+    const a = apps.find((x) => x.id === d.id);
+    if (a && a.description !== d.description && d.oldDescriptions.includes(a.description)) { a.description = d.description; reworded++; }
+  }
+  if (reworded) { await saveApps(); log(`Updated ${reworded} default description(s)`); }
 }
 
 // ---------- validation ----------

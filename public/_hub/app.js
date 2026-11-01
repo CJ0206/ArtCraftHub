@@ -44,6 +44,7 @@
   let openIds = [];            // tab order
   let active = 'home';
   const frames = new Map();    // id -> iframe (created lazily, kept alive while the tab is open)
+  const wraps = new Map();     // id -> { vp, size, shield } scrollable viewport around each iframe
   const problems = new Map();  // id -> { text } for apps that failed to start
   const appById = (id) => apps.find((a) => a.id === id);
 
@@ -74,7 +75,7 @@
   // ---------- theme ----------
   function applyTheme(t) {
     document.documentElement.dataset.theme = t;
-    const next = t === 'dark' ? '' : '';
+    const next = t === 'dark' ? 'Light theme' : 'Dark theme';
     $('#themeLbl').textContent = next;
     $('#themeBtn').setAttribute('aria-label', `Switch to ${next.toLowerCase()}`);
     $('#themeBtn').title = `Switch to ${next.toLowerCase()}`;
@@ -298,25 +299,118 @@
       allow: 'clipboard-read; clipboard-write; fullscreen; autoplay; encrypted-media', 'data-id': a.id,
     });
     f.addEventListener('load', () => { if (f.getAttribute('src')) onFrameLoad(a.id, f); });
-    frames.set(a.id, f); $('#frames').append(f);
+    const shield = h('div', { class: 'pan-shield', hidden: true });
+    const size = h('div', { class: 'vp-size' }, f, shield);
+    const vp = h('div', { class: 'vp' }, size);
+    frames.set(a.id, f); wraps.set(a.id, { vp, size, shield });
+    $('#frames').append(vp);
+    layoutAll();
     // Start loading on the next frame so the click that opened the tab returns immediately.
     requestAnimationFrame(() => { f.setAttribute('src', `/apps/${a.id}/`); });
     return f;
   }
+  function dropFrame(id) {
+    wraps.get(id)?.vp.remove(); wraps.delete(id);
+    frames.delete(id); problems.delete(id);
+  }
+
+  // ---------- small screens: a bigger virtual window, scaled to fit, with zoom and move ----------
+  // Apps are desktop-style and need room. On a narrow screen each app gets a window at least
+  // MIN_W wide, scaled down to fit. Zooming in magnifies it, and the viewport scrolls.
+  const MIN_W = 900;
+  const MAX_ZOOM = 2;
+  const STEPS = [0.4, 0.5, 0.65, 0.8, 1, 1.25, 1.5, 2];
+  const view = { scale: store.get('view', {}).scale ?? null, collapsed: store.get('view', {}).collapsed === true, move: false };
+  const saveView = () => store.set('view', { scale: view.scale, collapsed: view.collapsed });
+
+  function metrics() {
+    const box = $('#frames');
+    const cw = box.clientWidth, ch = box.clientHeight;
+    const small = prefs.fit && cw > 0 && cw < MIN_W;
+    const fit = small ? cw / MIN_W : 1;
+    let s = fit;
+    if (small && view.scale != null) s = Math.min(MAX_ZOOM, Math.max(fit, view.scale));
+    return { cw, ch, small, fit, s, vw: small ? MIN_W : cw, vh: small ? ch / fit : ch };
+  }
+
+  function layoutAll() {
+    const m = metrics();
+    const zoomed = m.small && m.s > m.fit + 0.01;
+    for (const [id, w] of wraps) {
+      const f = frames.get(id);
+      const set = (el, k, v) => el.style.setProperty(k, v);
+      if (!m.small) {
+        set(w.size, 'width', '100%'); set(w.size, 'height', '100%');
+        set(f, 'width', '100%'); set(f, 'height', '100%'); set(f, 'transform', 'none');
+      } else {
+        set(w.size, 'width', `${m.vw * m.s}px`); set(w.size, 'height', `${m.vh * m.s}px`);
+        set(f, 'width', `${m.vw}px`); set(f, 'height', `${m.vh}px`); set(f, 'transform', `scale(${m.s})`);
+      }
+      w.shield.hidden = !(zoomed && view.move);
+    }
+    updateViewbar(m, zoomed);
+    return m;
+  }
+
+  function updateViewbar(m, zoomed) {
+    const bar = $('#viewbar');
+    bar.hidden = !(m.small && active !== 'home');
+    bar.classList.toggle('collapsed', view.collapsed);
+    $('#vbLabel').textContent = `${Math.round(m.s * 100)}%`;
+    $('#vbOut').disabled = m.s <= m.fit + 0.01;
+    $('#vbIn').disabled = m.s >= MAX_ZOOM - 0.01;
+    $('#vbFit').disabled = !zoomed;
+    const pan = $('#vbPan');
+    pan.hidden = !zoomed;
+    pan.setAttribute('aria-pressed', String(view.move));
+    pan.textContent = view.move ? 'Use app' : 'Move view';
+    const t = $('#vbToggle');
+    t.setAttribute('aria-expanded', String(!view.collapsed));
+    t.setAttribute('aria-label', view.collapsed ? 'Show view controls' : 'Hide view controls');
+    t.title = t.getAttribute('aria-label');
+  }
+
+  function setScale(next) {
+    const before = metrics();
+    const w = wraps.get(active);
+    const rx = w ? (w.vp.scrollLeft + before.cw / 2) / Math.max(1, w.size.offsetWidth) : 0;
+    const ry = w ? (w.vp.scrollTop + before.ch / 2) / Math.max(1, w.size.offsetHeight) : 0;
+    view.scale = next == null || next <= before.fit + 0.01 ? null : Math.min(MAX_ZOOM, next);
+    if (view.scale == null) view.move = false;
+    saveView();
+    const m = layoutAll();
+    if (w) { // keep whatever was in the middle of the screen in the middle
+      w.vp.scrollLeft = Math.max(0, rx * w.size.offsetWidth - m.cw / 2);
+      w.vp.scrollTop = Math.max(0, ry * w.size.offsetHeight - m.ch / 2);
+    }
+  }
+  function zoomStep(dir) {
+    const m = metrics();
+    const next = dir > 0 ? STEPS.find((x) => x > m.s + 0.01) : [...STEPS].reverse().find((x) => x < m.s - 0.01);
+    setScale(next == null ? (dir > 0 ? MAX_ZOOM : null) : next);
+  }
+  $('#vbIn').addEventListener('click', () => zoomStep(1));
+  $('#vbOut').addEventListener('click', () => zoomStep(-1));
+  $('#vbFit').addEventListener('click', () => setScale(null));
+  $('#vbPan').addEventListener('click', () => { view.move = !view.move; layoutAll(); });
+  $('#vbToggle').addEventListener('click', () => { view.collapsed = !view.collapsed; saveView(); layoutAll(); });
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => layoutAll()).observe($('#frames'));
+  window.addEventListener('orientationchange', () => setTimeout(layoutAll, 250));
 
   function activate(id) {
     if (id !== 'home' && !appById(id)) id = 'home';
     active = id;
     $('#home').hidden = id !== 'home';
-    for (const [fid, f] of frames) {
+    for (const [fid, w] of wraps) {
       const on = fid === id;
-      f.classList.toggle('active', on);
-      f.inert = !on;
+      w.vp.classList.toggle('active', on);
+      w.vp.inert = !on;
     }
     if (id !== 'home') {
       const a = appById(id);
       const f = frames.get(id) || makeFrame(a);
-      f.classList.add('active'); f.inert = false;
+      const w = wraps.get(id);
+      w.vp.classList.add('active'); w.vp.inert = false;
       document.title = `${a.name} · ArtCraft Hub`;
       requestAnimationFrame(() => { try { f.contentWindow.focus(); } catch { /* not ready */ } });
       keepStorage();
@@ -324,7 +418,7 @@
       document.title = 'ArtCraft Hub';
       loadApps();
     }
-    renderTabs(); renderProblem(); saveSession();
+    renderTabs(); renderProblem(); saveSession(); layoutAll();
   }
 
   function openApp(id) {
@@ -337,17 +431,20 @@
     if (frames.has(id) && !confirm(`Close ${a ? a.name : 'this tab'}?\n\nAnything you haven’t saved to your device will be lost.`)) return;
     const idx = openIds.indexOf(id);
     openIds = openIds.filter((x) => x !== id);
-    frames.get(id)?.remove(); frames.delete(id); problems.delete(id);
+    dropFrame(id);
     if (active === id) activate(openIds[Math.min(idx, openIds.length - 1)] || 'home');
     else { renderTabs(); saveSession(); }
   }
 
   // ---------- session memory and warnings ----------
-  const prefs = { warn: store.get('warn', true), restore: store.get('restore', true) };
+  const prefs = { warn: store.get('warn', true), restore: store.get('restore', true), fit: store.get('fit', true) };
   $('#warnPref').checked = prefs.warn;
   $('#restorePref').checked = prefs.restore;
+  $('#fitPref').checked = prefs.fit;
   $('#warnPref').addEventListener('change', (e) => { prefs.warn = e.target.checked; store.set('warn', prefs.warn); });
   $('#restorePref').addEventListener('change', (e) => { prefs.restore = e.target.checked; store.set('restore', prefs.restore); if (!prefs.restore) store.set('session', null); else saveSession(); });
+
+  $('#fitPref').addEventListener('change', (e) => { prefs.fit = e.target.checked; store.set('fit', prefs.fit); layoutAll(); });
 
   function saveSession() { if (prefs.restore) store.set('session', { tabs: openIds, active }); }
 
@@ -518,7 +615,7 @@
     if (!confirm(`Remove ${a.name}?\n\nIt will disappear from the hub for everyone. You can add it again later.`)) return;
     try {
       await api(`/api/admin/apps/${a.id}`, { method: 'DELETE' });
-      if (openIds.includes(a.id)) { frames.get(a.id)?.remove(); frames.delete(a.id); openIds = openIds.filter((x) => x !== a.id); if (active === a.id) activate('home'); }
+      if (openIds.includes(a.id)) { dropFrame(a.id); openIds = openIds.filter((x) => x !== a.id); if (active === a.id) activate('home'); }
       toast(`Removed ${a.name}.`); await refreshAdmin();
     } catch (e) { toast(e.message); }
   }
