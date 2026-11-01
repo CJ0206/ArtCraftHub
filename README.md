@@ -17,17 +17,11 @@ A small self-hosted launcher for the ArtCraft web apps (WordCraft, GridCraft, De
 
 You need a long random admin token. Generate one with `openssl rand -hex 24`.
 
-### Option 1: Portainer app template (easiest)
-
-`templates.json` in this repository is a Portainer v2 app template. Add its entry to your template list (see [Pi-Hosted](#pi-hosted-and-portainer-app-templates) below), then open **App Templates → ArtCraft Hub**, fill in `ADMIN_TOKEN` and deploy.
-
-The container fixes its own folder permissions on start, so no `chown` or user settings are needed, whether `/data` is a bind-mounted folder or a Docker volume.
-
-### Option 2: Portainer stack
+### Portainer stack
 
 *Stacks → Add stack → Web editor*, paste `docker-compose.yml`, add `ADMIN_TOKEN` under *Environment variables*, and deploy. The data lives in a Docker volume named `artcraft-data`, which survives updates.
 
-### Option 3: build it yourself on GitHub
+### Bbuild it yourself on GitHub
 
 Fork or copy this repository. The workflow in `.github/workflows/docker.yml` builds a multi-architecture image to `ghcr.io/<you>/<repository>:latest` on every push to `main` and weekly. Set the package to **Public** (profile → Packages → your package → Package settings → Change visibility) so other people's Portainer can pull it.
 
@@ -36,19 +30,6 @@ After the first start, open `http://<server>:8086/`, press **Manage**, and watch
 ### HTTPS is required for public use
 
 Browsers only offer the file picker, clipboard access and persistent storage on secure pages (HTTPS, or `localhost`). Over plain `http://192.168.x.x` the apps load but may not be able to save to the visitor's device. Put the container behind HTTPS with a Cloudflare Tunnel, Caddy, Nginx Proxy Manager or Traefik, forwarding to the container's port 8080.
-
-## Pi-Hosted and Portainer app templates
-
-[Pi-Hosted](https://github.com/pi-hosted/pi-hosted) is a popular collection of Portainer app templates and tutorials for hosting self-hosted apps on a Raspberry Pi. Its templates use the same Portainer v2 format as `templates.json` here, so ArtCraft Hub drops straight in.
-
-Portainer reads **one** template list at a time (*Settings → App templates → URL*), so pick one of these:
-
-1. **Add ArtCraft Hub to your own template list.** Copy the object inside `"templates": [ ... ]` in this repository's `templates.json` into your own template file, for example your fork of Pi-Hosted, and point Portainer's *App templates* URL at that file's raw link. This keeps all your other apps.
-2. **Use this repository's list on its own.** Set *App templates → URL* to the raw link of `templates.json`:
-   `https://raw.githubusercontent.com/CJ0206/ArtCraftHub/main/templates.json`
-   This replaces the list, so you will only see ArtCraft Hub.
-
-Then open **App Templates**, choose **ArtCraft Hub**, set the admin token, and deploy.
 
 ## Configuration
 
