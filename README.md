@@ -13,6 +13,9 @@ A small self-hosted launcher for the ArtCraft web apps (WordCraft, GridCraft, De
 - **No uploads.** The server has no endpoint that accepts files. Opening and saving happen in the visitor's browser.
 - **amd64, arm64 and armv7**, so it runs on a Raspberry Pi and on normal PCs.
 
+- <img width="949" height="740" alt="image" src="https://github.com/user-attachments/assets/521f0992-19ea-427f-bc0b-ad25f3854122" />
+
+
 ## Deploy
 
 You need a long random admin token. Generate one with `openssl rand -hex 24`.
