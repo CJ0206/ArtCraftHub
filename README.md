@@ -21,7 +21,7 @@ You need a long random admin token. Generate one with `openssl rand -hex 24`.
 
 *Stacks → Add stack → Web editor*, paste `docker-compose.yml`, add `ADMIN_TOKEN` under *Environment variables*, and deploy. The data lives in a Docker volume named `artcraft-data`, which survives updates.
 
-### Bbuild it yourself on GitHub
+### Build it yourself on GitHub
 
 Fork or copy this repository. The workflow in `.github/workflows/docker.yml` builds a multi-architecture image to `ghcr.io/<you>/<repository>:latest` on every push to `main` and weekly. Set the package to **Public** (profile → Packages → your package → Package settings → Change visibility) so other people's Portainer can pull it.
 
