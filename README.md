@@ -95,3 +95,11 @@ If something fails, the in-app **Help** button lists what visitors can try, and 
 - **Crash recovery has limits.** The hub remembers which tabs were open. What is inside each document is up to the app: it survives a crash only if that app autosaves to browser storage. Saving to a file on the device is the only guarantee.
 - **The "unsaved changes" warning is generic.** Browsers do not let a page see what is unsaved inside an app, so the warning appears whenever any app tab is open. It cannot fire if the browser itself crashes.
 - **Memory.** Every open tab is a running WebAssembly app in the visitor's browser. Tabs restored after a refresh load only when clicked.
+
+## Example repositories
+
+| GitHub repository | Name | Group | Description |
+|---|---|---| --- |
+| tangency-labs/solidcraft | SolidCraft | CAD/CAM | 3D Modelling. |
+| storytold/cadcraft | CADCraft | CAD/CAM | 2D Modelling. |
+| UCS-Care-Group/mailcraft | MailCraft | Office | Email client. |
