@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark light">
-  <meta name="theme-color" content="#171a21">
+  <meta name="theme-color" content="#17171b">
   <title>ArtCraft Hub</title>
   <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
@@ -15,6 +15,9 @@
 </head>
 <body>
   <header class="bar">
+    <button class="btn ghost rail-toggle" id="railBtn" type="button" aria-controls="rail" aria-expanded="false" aria-label="Show app launcher" title="Show app launcher" hidden>
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9.5 4.5v15" stroke="currentColor" stroke-width="1.8"/></svg>
+    </button>
     <a class="brand" href="/" aria-label="ArtCraft Hub home">
       <img src="/logo-96.png" alt="" width="30" height="30">
       <span>ArtCraft Hub</span>
@@ -46,6 +49,11 @@
   </div>
 
   <main id="stage">
+    <nav class="rail" id="rail" aria-label="Launch an app" hidden>
+      <div class="rail-list" id="railList"></div>
+    </nav>
+    <div class="rail-scrim" id="railScrim" hidden></div>
+    <div class="stage-main">
     <div class="problem" id="problemBar" role="alert" hidden>
       <div class="problem-text">
         <strong id="problemTitle"></strong>
@@ -58,13 +66,16 @@
     </div>
     <section class="home" id="home" role="tabpanel" aria-labelledby="tab-home">
       <div class="home-inner">
-        <h1>Open a tool</h1>
-        <p class="lede">Pick an app to open it in a tab. Switch between tabs without losing your place.</p>
+        <header class="hero">
+          <h1>What will you <span class="hl">craft</span> today?</h1>
+          <p class="lede">Pick an app to open it in a tab. Switch between tabs without losing your place.</p>
+        </header>
         <div id="groups" aria-live="polite"></div>
         <p class="privacy">Your files stay on your device. Opening and saving happens in your browser, and nothing is uploaded to this server.</p>
         <fieldset class="prefs">
           <legend>Preferences</legend>
-          <label><input type="checkbox" id="warnPref"> Warn me before I close this page while apps are open</label>
+          <label><input type="checkbox" id="warnPref"> Warn me before closing this page or an app tab</label>
+          <p class="note" id="closeNote"></p>
           <label><input type="checkbox" id="restorePref"> Reopen my tabs when I come back</label>
           <label><input type="checkbox" id="fitPref"> Fit apps to small screens, with zoom and move controls</label>
           <p class="note" id="storageNote"></p>
@@ -72,7 +83,15 @@
         <p class="contact" id="contact" hidden></p>
       </div>
     </section>
-    <div id="frames"></div>
+    <section class="appwin off" id="appwin" aria-label="Open app">
+      <div class="appbar" id="appbar">
+        <span class="appbar-info" id="appbarInfo"></span>
+        <button class="appbar-x" id="appbarClose" type="button" aria-label="Close app" title="Close app">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <div id="frames"></div>
+    </section>
     <div class="viewbar" id="viewbar" role="toolbar" aria-label="View controls" hidden>
       <span class="vb-controls" id="vbControls">
         <button id="vbOut" type="button" aria-label="Zoom out" title="Zoom out">&minus;</button>
@@ -83,6 +102,7 @@
       <button id="vbToggle" type="button" aria-expanded="true" aria-label="Hide view controls" title="Hide view controls">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
+    </div>
     </div>
   </main>
 
@@ -95,11 +115,20 @@
       <h3>Using the apps</h3>
       <ul>
         <li>Pick a tool on the Home tab to open it in a new tab. Switch between tabs whenever you like; each open app keeps its place.</li>
+        <li>While an app is open, the icons down the left side jump to any other app, and a green dot marks the ones already open. The list scrolls if there are many. Press the panel button at the top left to hide or show it; on small screens it opens over the app and closes when you pick one.</li>
+        <li>On each tab, an open eye means that app is showing, and a crossed eye means it is hidden but still running (or not started yet, if the tab looks faded). The title bar above the app has a close button, and the logo takes you back Home without reloading.</li>
         <li>Open and save files from each app’s own menus. Files come from and go to your device, and nothing is uploaded to this server.</li>
         <li>Save to a file often. Browser storage is not a backup, and a crash or cleared browser data can lose unsaved work.</li>
-        <li>You are warned before closing the page while apps are open. You can turn that off, and tab restoring too, under Preferences on the Home tab.</li>
+        <li>You are warned before closing the page or an app tab while apps are open. You can turn that off, and tab restoring too, under Preferences on the Home tab, which also says whether the warning is active.</li>
         <li>A banner offers a refresh when an app is added, updated or removed. Save your work first, because refreshing restarts the open apps.</li>
         <li>A small arrow beside a version number means a newer version exists that the site owner has not installed yet.</li>
+      </ul>
+
+      <h3>Keeping your work safe</h3>
+      <ul>
+        <li>Your browser only shows the close warning after you have clicked or typed on the page. If you have just reopened the page, click anywhere once.</li>
+        <li>Phone and tablet browsers mostly never show it, and no browser can warn if it crashes, restarts or the device shuts down. Saving to a file is the only real protection.</li>
+        <li>Browsers can put background tabs to sleep to save memory, which restarts the apps in them without any warning. In Chrome, add this site under Settings → Performance → Memory Saver → Always keep these sites active. In Edge, use Settings → System and performance → Never put these sites to sleep.</li>
       </ul>
 
       <h3>Using the apps on a phone or tablet</h3>

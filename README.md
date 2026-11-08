@@ -2,9 +2,10 @@
 
 A small self-hosted launcher for the ArtCraft web apps (WordCraft, GridCraft, DeckCraft, PdfCraft, DesignCraft, PhotoCraft and any others you add). One container, one page, each app in its own tab.
 
-- **Dark by default**, with a light theme toggle. The layout and text scale with the screen, and the header uses compact icon buttons (Help, theme, Manage).
+- **Dark by default**, in a near-black palette with filled grey cards and one blue accent to sit alongside the ArtCraft apps, with a matching light theme toggle. The layout and text scale with the screen, and the header uses compact icon buttons (Help, theme, Manage).
 - **Works on phones and tablets.** Home is a single clear column on a phone. Apps get a larger virtual window scaled to fit the screen, with zoom (+ and −), a fit button, and a Move view mode for looking around when zoomed in. Switch it off under Preferences if you prefer apps at their normal size.
 - **Tabs stay alive** while you switch between apps, so nothing reloads or loses state.
+- **Launcher rail.** While an app is open, a scrollable column of app icons on the left switches between apps. It can be hidden, and on phones it becomes a drawer opened from the top-left button. Tabs show whether each app is showing or running in the background, and the open app sits in a framed window with a title bar (icon, name, version, close).
 - **Warns before you close the page** while apps are open, and **reopens your tabs** after a refresh or crash.
 - **Updates itself.** The container checks each app's GitHub releases every few hours and installs new versions without a restart. Visitors see a banner offering to refresh.
 - **Checks what it installs.** Every download is verified before use. Misplaced files are moved into place, and if the newest release is broken the hub keeps or installs the newest one that works and tells you why in Manage.
@@ -12,8 +13,6 @@ A small self-hosted launcher for the ArtCraft web apps (WordCraft, GridCraft, De
 - **Explains failures.** If an app cannot start, a bar above it says why. The Help button covers using the apps, fixing problems, adding apps and the limitations.
 - **No uploads.** The server has no endpoint that accepts files. Opening and saving happen in the visitor's browser.
 - **amd64, arm64 and armv7**, so it runs on a Raspberry Pi and on normal PCs.
-
-<img width="949" height="740" alt="image" src="https://github.com/user-attachments/assets/521f0992-19ea-427f-bc0b-ad25f3854122" />
 
 ## Deploy
 
@@ -93,13 +92,6 @@ If something fails, the in-app **Help** button lists what visitors can try, and 
 - **Apps share one origin.** Each app runs in an iframe at `/apps/<name>/` on the same domain. That keeps the file picker working and lets tabs share the page, but all apps then share the browser's localStorage and IndexedDB for your domain. If two apps use the same storage key they could overwrite each other. If you see that, the fix is to serve each app on its own subdomain.
 - **Treat releases as trusted code.** Because of the shared origin, an app can in principle see the dashboard's storage. Only add repositories you trust. The admin token is kept in memory only and is never written to browser storage.
 - **Crash recovery has limits.** The hub remembers which tabs were open. What is inside each document is up to the app: it survives a crash only if that app autosaves to browser storage. Saving to a file on the device is the only guarantee.
+- **Close warnings depend on the browser.** Browsers show the warning only after you have clicked or typed on the page, most phone browsers never show it, and none can warn on a crash or shutdown. Preferences on the Home tab says whether it is active. Background-tab sleeping (Chrome's Memory Saver, Edge's sleeping tabs) can unload apps silently, so add the site to the always-active list.
 - **The "unsaved changes" warning is generic.** Browsers do not let a page see what is unsaved inside an app, so the warning appears whenever any app tab is open. It cannot fire if the browser itself crashes.
 - **Memory.** Every open tab is a running WebAssembly app in the visitor's browser. Tabs restored after a refresh load only when clicked.
-
-## Example repositories
-
-| GitHub repository | Name | Group | Description |
-|---|---|---| --- |
-| tangency-labs/solidcraft | SolidCraft | CAD/CAM | 3D Modelling. |
-| storytold/cadcraft | CADCraft | CAD/CAM | 2D Modelling. |
-| UCS-Care-Group/mailcraft | MailCraft | Office | Email client. |

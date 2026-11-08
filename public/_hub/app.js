@@ -49,7 +49,7 @@
   const appById = (id) => apps.find((a) => a.id === id);
 
   // ---------- group colours ----------
-  const DEFAULT_CAT = { Office: 'var(--accent)', Create: 'var(--rose)', Other: 'var(--sage)' };
+  const DEFAULT_CAT = { Office: 'var(--lav)', Create: 'var(--rose)', Other: 'var(--sage)' };
   const PRESETS = ['#8fa5ff', '#f08fa6', '#8fd1b0', '#f5c26b', '#c4a1ff', '#6fd0e0', '#ff9f7a', '#a6b1c2'];
   const HEX = /^#[0-9a-f]{6}$/i;
 
@@ -80,13 +80,16 @@
     $('#themeBtn').setAttribute('aria-label', `Switch to ${next.toLowerCase()}`);
     $('#themeBtn').title = `Switch to ${next.toLowerCase()}`;
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', t === 'dark' ? '#171a21' : '#f4f5f8');
+    if (meta) meta.setAttribute('content', t === 'dark' ? '#17171b' : '#ffffff');
   }
   $('#themeBtn').addEventListener('click', () => {
     const t = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
     store.set('theme', t); applyTheme(t);
   });
   applyTheme(document.documentElement.dataset.theme);
+
+  // The logo goes Home without reloading, so open apps keep their place.
+  document.querySelector('.brand')?.addEventListener('click', (e) => { e.preventDefault(); drawerOpen = false; activate('home'); });
 
   // ---------- dialogs ----------
   document.addEventListener('click', (e) => {
@@ -176,43 +179,126 @@
     el.hidden = false;
   }
 
-  function tile(a) {
-    const letter = h('span', { class: 'ico letter', 'aria-hidden': 'true', text: a.name.slice(0, 1).toUpperCase() });
-    const icon = a.icon
-      ? h('img', { class: 'ico', src: `/icons/${a.id}?v=${a.iconV || 0}`, alt: '', width: 64, height: 64, onerror(e) { e.target.replaceWith(letter); } })
+  // Small inline SVG builder: icon([['path', {d: ...}], ['circle', {...}]], size)
+  function icon(parts, size = 18, extra = {}) {
+    const s = document.createElementNS(SVG_NS, 'svg');
+    s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('width', size); s.setAttribute('height', size); s.setAttribute('aria-hidden', 'true');
+    for (const [k, v] of Object.entries(extra)) s.setAttribute(k, v);
+    for (const [tag, attrs] of parts) {
+      const el = document.createElementNS(SVG_NS, tag);
+      for (const [k, v] of Object.entries({ fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', ...attrs })) el.setAttribute(k, v);
+      s.append(el);
+    }
+    return s;
+  }
+  const EYE = [['path', { d: 'M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z' }], ['circle', { cx: 12, cy: 12, r: 2.8 }]];
+  const EYE_OFF = [...EYE, ['path', { d: 'M4 4l16 16' }]];
+  const HOME = [['path', { d: 'M4 11l8-6.5 8 6.5v8.5a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z' }]];
+  const CLOSE = [['path', { d: 'M6 6l12 12M18 6L6 18' }]];
+
+  function appIcon(a, size, cls = 'ico') {
+    const letter = h('span', { class: `${cls} letter`, 'aria-hidden': 'true', text: a.name.slice(0, 1).toUpperCase() });
+    return a.icon
+      ? h('img', { class: cls, src: `/icons/${a.id}?v=${a.iconV || 0}`, alt: '', width: size, height: size, onerror(e) { e.target.replaceWith(letter); } })
       : letter;
+  }
+  const badge = (text, cls, title) => h('span', { class: `badge ${cls}`, title: title || null, text });
+
+  function tile(a) {
     const isOpen = openIds.includes(a.id);
     return h('button', { class: 'tile', type: 'button', onclick: () => openApp(a.id) },
-      icon,
-      h('span', {},
-        h('span', { class: 'name', text: a.name }),
+      appIcon(a, 52),
+      h('span', { class: 'tx' },
+        h('span', { class: 'name-row' },
+          h('span', { class: 'name', text: a.name }),
+          a.updateAvailable ? badge('Update', 'upd', `A newer version (${a.latest}) is available. The site owner hasn’t installed it yet.`) : null,
+          isOpen ? badge('Open', 'open', 'Open in a tab') : null),
         a.description ? h('span', { class: 'desc', text: a.description }) : null,
-        h('span', { class: 'ver' },
-          a.version ? `Version ${a.version}` : '',
-          a.updateAvailable ? h('span', { class: 'upd', title: `A newer version (${a.latest}) is available. The site owner hasn’t installed it yet.` }, arrowIcon(), 'Update available') : null,
-          isOpen ? h('span', { class: 'open-pill', text: 'Open in a tab' }) : null)));
+        a.version ? h('span', { class: 'ver', text: `Version ${a.version}` }) : null));
   }
+
+  // ---------- left launcher, shown while an app is open ----------
+  const mqSmall = window.matchMedia ? window.matchMedia('(max-width: 760px)') : { matches: false };
+  let drawerOpen = false;       // small screens: the launcher is a drawer that starts closed
+  const railWanted = () => active !== 'home' && (mqSmall.matches ? drawerOpen : store.get('rail', 'open') !== 'closed');
+
+  function renderRail() {
+    const groups = new Map();
+    for (const a of apps) { const c = a.category || 'Other'; if (!groups.has(c)) groups.set(c, []); groups.get(c).push(a); }
+    const items = [h('button', { class: 'rail-btn home' + (active === 'home' ? ' active' : ''), type: 'button', title: 'Home', 'aria-label': 'Home', onclick: () => { drawerOpen = false; activate('home'); } }, icon(HOME, 22))];
+    for (const cat of catOrder(groups.keys())) {
+      items.push(h('span', { class: 'rail-sep', role: 'presentation' }));
+      for (const a of groups.get(cat)) {
+        const open = openIds.includes(a.id);
+        items.push(paint(h('button', {
+          class: 'rail-btn' + (active === a.id ? ' active' : '') + (open ? ' open' : ''), type: 'button',
+          title: a.name, 'aria-label': a.name + (open ? ' (open)' : ''), 'aria-current': active === a.id ? 'true' : null,
+          onclick: () => { drawerOpen = false; openApp(a.id); },
+        }, appIcon(a, 34)), a.category));
+      }
+    }
+    $('#railList').replaceChildren(...items);
+  }
+
+  function applyRail() {
+    const shown = railWanted();
+    $('#rail').hidden = !shown;
+    $('#railScrim').hidden = !(shown && mqSmall.matches);
+    const btn = $('#railBtn');
+    btn.hidden = active === 'home';
+    const label = shown ? 'Hide app launcher' : 'Show app launcher';
+    btn.setAttribute('aria-expanded', String(shown)); btn.setAttribute('aria-label', label); btn.title = label;
+  }
+  function toggleRail() {
+    if (mqSmall.matches) drawerOpen = !drawerOpen;
+    else store.set('rail', railWanted() ? 'closed' : 'open');
+    applyRail();
+  }
+  $('#railBtn').addEventListener('click', toggleRail);
+  $('#railScrim').addEventListener('click', () => { drawerOpen = false; applyRail(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && mqSmall.matches && drawerOpen) { drawerOpen = false; applyRail(); } });
+  if (mqSmall.addEventListener) mqSmall.addEventListener('change', () => { drawerOpen = false; applyRail(); });
+
+  // ---------- title bar above the open app: icon, name, version and close ----------
+  function renderAppBar() {
+    const win = $('#appwin');
+    const a = active === 'home' ? null : appById(active);
+    win.classList.toggle('off', !a);
+    if (!a) return;
+    $('#appbarInfo').replaceChildren(
+      appIcon(a, 20, 'bico'),
+      h('span', { class: 'nm', text: a.name }),
+      a.version ? h('span', { class: 'ver', text: a.version }) : null);
+    $('#appbarClose').setAttribute('aria-label', `Close ${a.name}`);
+    $('#appbarClose').title = `Close ${a.name}`;
+  }
+  $('#appbarClose').addEventListener('click', () => { if (active !== 'home') closeApp(active); });
 
   // ---------- tabs ----------
   function renderTabs() {
     const tabs = [tabEl({ id: 'home', name: 'Home' })];
     for (const id of openIds) { const a = appById(id); if (a) tabs.push(tabEl(a)); }
     $('#tabs').replaceChildren(...tabs);
-    if ($('#groups').children.length) renderHome(); // refresh the "Open in a tab" markers
+    if ($('#groups').children.length) renderHome(); // refresh the "Open" badges
+    renderRail();
   }
 
   function tabEl(a) {
     const isHome = a.id === 'home';
     const isActive = active === a.id;
+    const loaded = frames.has(a.id);
+    const status = isHome ? null : h('span', {
+      class: 'eye', title: isActive ? 'Showing now' : loaded ? 'Running in the background' : 'Not started yet',
+    }, icon(isActive ? EYE : EYE_OFF, 15));
     const main = h('button', {
       class: 'main', type: 'button', role: 'tab', id: `tab-${a.id}`, 'aria-selected': String(isActive),
       'aria-controls': isHome ? 'home' : `frame-${a.id}`, tabindex: isActive ? '0' : '-1',
       onclick: () => activate(a.id), onkeydown: tabKeys,
-    }, isHome ? null : h('span', { class: 'dot' }), h('span', { class: 'label', text: a.name }));
-    const wrap = h('div', { class: 'tab' + (isActive ? ' active' : '') + (!isHome && !frames.has(a.id) ? ' unloaded' : ''), role: 'presentation' }, main);
+    }, isHome ? icon(HOME, 16) : appIcon(a, 18, 'tico'), h('span', { class: 'label', text: a.name }), status);
+    const wrap = h('div', { class: 'tab' + (isActive ? ' active' : '') + (!isHome && !loaded ? ' unloaded' : ''), role: 'presentation' }, main);
     if (!isHome) {
       paint(wrap, a.category);
-      wrap.append(h('button', { class: 'x', type: 'button', 'aria-label': `Close ${a.name}`, title: 'Close tab', onclick: (e) => { e.stopPropagation(); closeApp(a.id); } }, '×'));
+      wrap.append(h('button', { class: 'x', type: 'button', 'aria-label': `Close ${a.name}`, title: 'Close tab', onclick: (e) => { e.stopPropagation(); closeApp(a.id); } }, icon(CLOSE, 13)));
       wrap.addEventListener('auxclick', (e) => { if (e.button === 1) { e.preventDefault(); closeApp(a.id); } });
     }
     return wrap;
@@ -266,6 +352,7 @@
     const errors = [];
     try {
       const w = f.contentWindow;
+      for (const ev of ['pointerdown', 'keydown', 'touchstart']) w.addEventListener(ev, onActivity, { capture: true, passive: true });
       w.addEventListener('error', (e) => { if (e.message && !IGNORED_ERRORS.test(e.message)) errors.push(e.message); });
       w.addEventListener('unhandledrejection', (e) => {
         const m = e.reason && (e.reason.message || String(e.reason));
@@ -312,6 +399,7 @@
   function dropFrame(id) {
     wraps.get(id)?.vp.remove(); wraps.delete(id);
     frames.delete(id); problems.delete(id);
+    renderProtection();
   }
 
   // ---------- small screens: a bigger virtual window, scaled to fit, with zoom and move ----------
@@ -418,7 +506,7 @@
       document.title = 'ArtCraft Hub';
       loadApps();
     }
-    renderTabs(); renderProblem(); saveSession(); layoutAll();
+    renderTabs(); renderProblem(); renderAppBar(); saveSession(); applyRail(); layoutAll(); renderProtection();
   }
 
   function openApp(id) {
@@ -428,7 +516,7 @@
 
   function closeApp(id) {
     const a = appById(id);
-    if (frames.has(id) && !confirm(`Close ${a ? a.name : 'this tab'}?\n\nAnything you haven’t saved to your device will be lost.`)) return;
+    if (prefs.warn && frames.has(id) && !confirm(`Close ${a ? a.name : 'this tab'}?\n\nAnything you haven’t saved to your device will be lost.`)) return;
     const idx = openIds.indexOf(id);
     openIds = openIds.filter((x) => x !== id);
     dropFrame(id);
@@ -441,7 +529,7 @@
   $('#warnPref').checked = prefs.warn;
   $('#restorePref').checked = prefs.restore;
   $('#fitPref').checked = prefs.fit;
-  $('#warnPref').addEventListener('change', (e) => { prefs.warn = e.target.checked; store.set('warn', prefs.warn); });
+  $('#warnPref').addEventListener('change', (e) => { prefs.warn = e.target.checked; store.set('warn', prefs.warn); renderProtection(); });
   $('#restorePref').addEventListener('change', (e) => { prefs.restore = e.target.checked; store.set('restore', prefs.restore); if (!prefs.restore) store.set('session', null); else saveSession(); });
 
   $('#fitPref').addEventListener('change', (e) => { prefs.fit = e.target.checked; store.set('fit', prefs.fit); layoutAll(); });
@@ -449,8 +537,43 @@
   function saveSession() { if (prefs.restore) store.set('session', { tabs: openIds, active }); }
 
   window.addEventListener('beforeunload', (e) => {
-    if (prefs.warn && frames.size) { e.preventDefault(); e.returnValue = ''; }
+    if (!prefs.warn || !frames.size) return undefined;
+    const msg = 'Apps are open. Anything you haven’t saved to your device will be lost.';
+    e.preventDefault();
+    e.returnValue = msg; // older browsers need a non-empty string
+    return msg;
   });
+
+  // Browsers only show the close warning once you have interacted with the page, and most
+  // phone browsers never show it. This says which situation you are in, live.
+  let lastProtection = '';
+  function protectionState() {
+    if (!prefs.warn) return 'off';
+    if (!frames.size) return 'idle';
+    if (window.matchMedia?.('(pointer: coarse)').matches) return 'touch';
+    if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return 'waiting';
+    return 'ready';
+  }
+  const PROTECTION_TEXT = {
+    off: 'Close warnings are off. Closing an app tab or this page will not ask first.',
+    idle: 'The close warning switches on as soon as you open an app.',
+    touch: 'Phone and tablet browsers usually can’t warn when you close the tab, so save to a file before you leave.',
+    waiting: 'Click anywhere on this page once. Your browser only shows the close warning after you have interacted with the page.',
+    ready: 'Close warning is on. Your browser will ask before the tab or window closes. It cannot warn if the browser or device shuts down or crashes.',
+  };
+  function renderProtection() {
+    const st = protectionState();
+    if (st === lastProtection) return;
+    lastProtection = st;
+    $('#closeNote').textContent = PROTECTION_TEXT[st];
+  }
+  let activityQueued = false;
+  function onActivity() {
+    if (activityQueued) return;
+    activityQueued = true;
+    requestAnimationFrame(() => { activityQueued = false; renderProtection(); });
+  }
+  for (const ev of ['pointerdown', 'keydown', 'touchstart']) window.addEventListener(ev, onActivity, { capture: true, passive: true });
 
   async function keepStorage() {
     if (!navigator.storage?.persist) return;
@@ -674,13 +797,17 @@
 
   // ---------- start ----------
   (async () => {
-    showStorageNote();
+    showStorageNote(); renderProtection();
     const ok = await loadApps();
     if (!ok) return;
     const s = prefs.restore ? store.get('session', null) : null;
     if (s && Array.isArray(s.tabs)) {
       openIds = s.tabs.filter((id) => appById(id));
-      if (openIds.length) { activate(openIds.includes(s.active) ? s.active : 'home'); toast('Reopened your tabs. Open your files again if an app starts empty.'); return; }
+      if (openIds.length) {
+        activate(openIds.includes(s.active) ? s.active : 'home');
+        toast(protectionState() === 'waiting' ? 'Reopened your tabs. Click anywhere to switch on the close warning, and open your files again if an app starts empty.' : 'Reopened your tabs. Open your files again if an app starts empty.');
+        return;
+      }
     }
     renderTabs();
   })();
