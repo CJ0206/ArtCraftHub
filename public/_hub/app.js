@@ -41,12 +41,18 @@
   let apps = [];
   let categories = {};         // group name -> colour chosen by the owner
   let site = { contact: null };
-  let openIds = [];            // tab order
-  let active = 'home';
+  let openTabs = [];           // open tabs in order: { tid, app, num }. The same app can be open more than once.
+  let tidSeq = 0;
+  const lastTab = {};          // app id -> the tab of that app used most recently
+  let active = 'home';        // 'home' or a tab id
   const frames = new Map();    // id -> iframe (created lazily, kept alive while the tab is open)
   const wraps = new Map();     // id -> { vp, size, shield } scrollable viewport around each iframe
   const problems = new Map();  // id -> { text } for apps that failed to start
   const appById = (id) => apps.find((a) => a.id === id);
+  const tabById = (tid) => openTabs.find((t) => t.tid === tid) || null;
+  const activeTab = () => tabById(active);
+  const activeApp = () => { const t = activeTab(); return t ? appById(t.app) : null; };
+  const tabLabel = (t, a) => (a ? a.name : 'App') + (t.num > 1 ? ` ${t.num}` : '');
 
   // ---------- group colours ----------
   const DEFAULT_CAT = { Office: 'var(--lav)', Create: 'var(--rose)', Other: 'var(--sage)' };
@@ -154,7 +160,26 @@
     });
   };
 
-  function renderHome() {
+  function renderHome() { renderHomeInner(); layoutHome(); }
+
+  // Every group uses the same columns, so tiles line up across groups. The count is as many as fit
+  // the screen, but never more than the biggest group needs. The block stays centred.
+  function layoutHome() {
+    const block = $('#homeBlock');
+    const inner = document.querySelector('.home-inner');
+    if (!block || !inner) return;
+    const cs = getComputedStyle(inner);
+    const avail = inner.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const gap = 0.8 * rem, min = 17 * rem;
+    const fit = Math.max(1, Math.floor((avail + gap) / (min + gap)));
+    const biggest = Math.max(1, ...[...document.querySelectorAll('#groups .tiles')].map((g) => g.children.length));
+    block.style.setProperty('--cols', String(Math.min(fit, biggest)));
+  }
+  if (typeof ResizeObserver !== 'undefined') { const inner = document.querySelector('.home-inner'); if (inner) new ResizeObserver(() => layoutHome()).observe(inner); }
+  window.addEventListener('resize', layoutHome);
+
+  function renderHomeInner() {
     const groups = new Map();
     for (const a of apps) { const c = a.category || 'Other'; if (!groups.has(c)) groups.set(c, []); groups.get(c).push(a); }
     if (!groups.size) {
@@ -205,14 +230,14 @@
   const badge = (text, cls, title) => h('span', { class: `badge ${cls}`, title: title || null, text });
 
   function tile(a) {
-    const isOpen = openIds.includes(a.id);
-    return h('button', { class: 'tile', type: 'button', onclick: () => openApp(a.id) },
+    const n = openTabs.filter((t) => t.app === a.id).length;
+    return h('button', { class: 'tile', type: 'button', onclick: () => openNew(a.id) },
       appIcon(a, 52),
       h('span', { class: 'tx' },
         h('span', { class: 'name-row' },
           h('span', { class: 'name', text: a.name }),
           a.updateAvailable ? badge('Update', 'upd', `A newer version (${a.latest}) is available. The site owner hasn’t installed it yet.`) : null,
-          isOpen ? badge('Open', 'open', 'Open in a tab') : null),
+          n ? badge(n > 1 ? `Open ×${n}` : 'Open', 'open', n > 1 ? `Open in ${n} tabs. Clicking opens another.` : 'Open in a tab. Clicking opens another.') : null),
         a.description ? h('span', { class: 'desc', text: a.description }) : null,
         a.version ? h('span', { class: 'ver', text: `Version ${a.version}` }) : null));
   }
@@ -229,12 +254,14 @@
     for (const cat of catOrder(groups.keys())) {
       items.push(h('span', { class: 'rail-sep', role: 'presentation' }));
       for (const a of groups.get(cat)) {
-        const open = openIds.includes(a.id);
+        const n = openTabs.filter((t) => t.app === a.id).length;
+        const here = activeTab()?.app === a.id;
         items.push(paint(h('button', {
-          class: 'rail-btn' + (active === a.id ? ' active' : '') + (open ? ' open' : ''), type: 'button',
-          title: a.name, 'aria-label': a.name + (open ? ' (open)' : ''), 'aria-current': active === a.id ? 'true' : null,
-          onclick: () => { drawerOpen = false; openApp(a.id); },
-        }, appIcon(a, 34)), a.category));
+          class: 'rail-btn' + (here ? ' active' : '') + (n ? ' open' : ''), type: 'button',
+          title: n > 1 ? `${a.name} (${n} tabs open). Shift-click opens another` : a.name,
+          'aria-label': a.name + (n ? ` (${n} open)` : ''), 'aria-current': here ? 'true' : null,
+          onclick: (e) => { drawerOpen = false; if (e.shiftKey || e.ctrlKey || e.metaKey) openNew(a.id); else openApp(a.id); },
+        }, appIcon(a, 34), n > 1 ? h('span', { class: 'rail-count', text: String(n) }) : null), a.category));
       }
     }
     $('#railList').replaceChildren(...items);
@@ -262,49 +289,56 @@
   // ---------- title bar above the open app: icon, name, version and close ----------
   function renderAppBar() {
     const win = $('#appwin');
-    const a = active === 'home' ? null : appById(active);
+    const t = activeTab();
+    const a = t ? appById(t.app) : null;
     win.classList.toggle('off', !a);
     if (!a) return;
+    const label = tabLabel(t, a);
     $('#appbarInfo').replaceChildren(
       appIcon(a, 20, 'bico'),
-      h('span', { class: 'nm', text: a.name }),
+      h('span', { class: 'nm', text: label }),
       a.version ? h('span', { class: 'ver', text: a.version }) : null);
-    $('#appbarClose').setAttribute('aria-label', `Close ${a.name}`);
-    $('#appbarClose').title = `Close ${a.name}`;
+    $('#appbarClose').setAttribute('aria-label', `Close ${label}`);
+    $('#appbarClose').title = `Close ${label}`;
+    $('#appbarNew').setAttribute('aria-label', `Open another ${a.name} in a new tab`);
+    $('#appbarNew').title = `Open another ${a.name} in a new tab`;
   }
   $('#appbarClose').addEventListener('click', () => { if (active !== 'home') closeApp(active); });
+  $('#appbarNew').addEventListener('click', () => { const a = activeApp(); if (a) openNew(a.id); });
 
   // ---------- tabs ----------
   function renderTabs() {
-    const tabs = [tabEl({ id: 'home', name: 'Home' })];
-    for (const id of openIds) { const a = appById(id); if (a) tabs.push(tabEl(a)); }
-    $('#tabs').replaceChildren(...tabs);
+    const chips = [tabEl(null, null)];
+    for (const t of openTabs) { const a = appById(t.app); if (a) chips.push(tabEl(t, a)); }
+    $('#tabs').replaceChildren(...chips);
     if ($('#groups').children.length) renderHome(); // refresh the "Open" badges
     renderRail();
   }
 
-  function tabEl(a) {
-    const isHome = a.id === 'home';
-    const isActive = active === a.id;
-    const loaded = frames.has(a.id);
+  function tabEl(t, a) {            // t === null is the Home tab
+    const isHome = !t;
+    const tid = isHome ? 'home' : t.tid;
+    const isActive = active === tid;
+    const loaded = !isHome && frames.has(tid);
+    const label = isHome ? 'Home' : tabLabel(t, a);
     const status = isHome ? null : h('span', {
       class: 'eye', title: isActive ? 'Showing now' : loaded ? 'Running in the background' : 'Not started yet',
     }, icon(isActive ? EYE : EYE_OFF, 15));
     const main = h('button', {
-      class: 'main', type: 'button', role: 'tab', id: `tab-${a.id}`, 'aria-selected': String(isActive),
-      'aria-controls': isHome ? 'home' : `frame-${a.id}`, tabindex: isActive ? '0' : '-1',
-      onclick: () => activate(a.id), onkeydown: tabKeys,
-    }, isHome ? icon(HOME, 16) : appIcon(a, 18, 'tico'), h('span', { class: 'label', text: a.name }), status);
+      class: 'main', type: 'button', role: 'tab', id: `tab-${tid}`, 'aria-selected': String(isActive),
+      'aria-controls': isHome ? 'home' : `frame-${tid}`, tabindex: isActive ? '0' : '-1',
+      onclick: () => activate(tid), onkeydown: tabKeys,
+    }, isHome ? icon(HOME, 16) : appIcon(a, 18, 'tico'), h('span', { class: 'label', text: label }), status);
     const wrap = h('div', { class: 'tab' + (isActive ? ' active' : '') + (!isHome && !loaded ? ' unloaded' : ''), role: 'presentation' }, main);
     if (!isHome) {
       paint(wrap, a.category);
-      wrap.append(h('button', { class: 'x', type: 'button', 'aria-label': `Close ${a.name}`, title: 'Close tab', onclick: (e) => { e.stopPropagation(); closeApp(a.id); } }, icon(CLOSE, 13)));
-      wrap.addEventListener('auxclick', (e) => { if (e.button === 1) { e.preventDefault(); closeApp(a.id); } });
+      wrap.append(h('button', { class: 'x', type: 'button', 'aria-label': `Close ${label}`, title: 'Close tab', onclick: (e) => { e.stopPropagation(); closeApp(tid); } }, icon(CLOSE, 13)));
+      wrap.addEventListener('auxclick', (e) => { if (e.button === 1) { e.preventDefault(); closeApp(tid); } });
     }
     return wrap;
   }
   function tabKeys(e) {
-    const order = ['home', ...openIds];
+    const order = ['home', ...openTabs.map((t) => t.tid)];
     const i = order.indexOf(active);
     let n = null;
     if (e.key === 'ArrowRight') n = order[(i + 1) % order.length];
@@ -335,8 +369,9 @@
     const bar = $('#problemBar');
     const p = problems.get(active);
     if (active === 'home' || !p) { bar.hidden = true; return; }
-    const a = appById(active);
-    $('#problemTitle').textContent = `${a ? a.name : 'This app'} couldn’t start properly.`;
+    const t = activeTab();
+    const a = t ? appById(t.app) : null;
+    $('#problemTitle').textContent = `${a ? tabLabel(t, a) : 'This app'} couldn’t start properly.`;
     $('#problemBody').textContent = p.text;
     bar.hidden = false;
   }
@@ -347,7 +382,7 @@
     if (f) { try { f.contentWindow.location.reload(); } catch { f.src = f.src; } }
   });
 
-  function onFrameLoad(id, f) {
+  function onFrameLoad(id, appId, f) {            // id is the tab, appId the app it runs
     const openedAt = Date.now();
     const errors = [];
     try {
@@ -362,7 +397,7 @@
     const check = async () => {
       if (frames.get(id) !== f) return;
       try {
-        const res = await fetch(`/api/apps/${id}/problems`, { cache: 'no-store' });
+        const res = await fetch(`/api/apps/${appId}/problems`, { cache: 'no-store' });
         const data = await res.json();
         const recent = (data.missing || []).filter((m) => m.ageSec <= (Date.now() - openedAt) / 1000 + 3);
         if (recent.length) {
@@ -380,20 +415,21 @@
   }
 
   // ---------- opening, switching, closing ----------
-  function makeFrame(a) {
+  function makeFrame(t) {
+    const a = appById(t.app);
     const f = h('iframe', {
-      class: 'frame', id: `frame-${a.id}`, title: a.name,
-      allow: 'clipboard-read; clipboard-write; fullscreen; autoplay; encrypted-media', 'data-id': a.id,
+      class: 'frame', id: `frame-${t.tid}`, title: tabLabel(t, a),
+      allow: 'clipboard-read; clipboard-write; fullscreen; autoplay; encrypted-media', 'data-id': t.app,
     });
-    f.addEventListener('load', () => { if (f.getAttribute('src')) onFrameLoad(a.id, f); });
+    f.addEventListener('load', () => { if (f.getAttribute('src')) onFrameLoad(t.tid, t.app, f); });
     const shield = h('div', { class: 'pan-shield', hidden: true });
     const size = h('div', { class: 'vp-size' }, f, shield);
     const vp = h('div', { class: 'vp' }, size);
-    frames.set(a.id, f); wraps.set(a.id, { vp, size, shield });
+    frames.set(t.tid, f); wraps.set(t.tid, { vp, size, shield });
     $('#frames').append(vp);
     layoutAll();
     // Start loading on the next frame so the click that opened the tab returns immediately.
-    requestAnimationFrame(() => { f.setAttribute('src', `/apps/${a.id}/`); });
+    requestAnimationFrame(() => { f.setAttribute('src', `/apps/${t.app}/`); });
     return f;
   }
   function dropFrame(id) {
@@ -486,7 +522,7 @@
   window.addEventListener('orientationchange', () => setTimeout(layoutAll, 250));
 
   function activate(id) {
-    if (id !== 'home' && !appById(id)) id = 'home';
+    if (id !== 'home') { const t0 = tabById(id); if (!t0 || !appById(t0.app)) id = 'home'; }
     active = id;
     $('#home').hidden = id !== 'home';
     for (const [fid, w] of wraps) {
@@ -495,11 +531,13 @@
       w.vp.inert = !on;
     }
     if (id !== 'home') {
-      const a = appById(id);
-      const f = frames.get(id) || makeFrame(a);
+      const t = tabById(id);
+      const a = appById(t.app);
+      lastTab[t.app] = id;
+      const f = frames.get(id) || makeFrame(t);
       const w = wraps.get(id);
       w.vp.classList.add('active'); w.vp.inert = false;
-      document.title = `${a.name} · ArtCraft Hub`;
+      document.title = `${tabLabel(t, a)} · ArtCraft Hub`;
       requestAnimationFrame(() => { try { f.contentWindow.focus(); } catch { /* not ready */ } });
       keepStorage();
     } else {
@@ -509,18 +547,29 @@
     renderTabs(); renderProblem(); renderAppBar(); saveSession(); applyRail(); layoutAll(); renderProtection();
   }
 
-  function openApp(id) {
-    if (!openIds.includes(id)) openIds.push(id);
-    activate(id);
+  // A new tab, even if this app is already open. Numbers are reused: WordCraft, WordCraft 2, ...
+  function openNew(appId) {
+    const used = new Set(openTabs.filter((t) => t.app === appId).map((t) => t.num));
+    let num = 1; while (used.has(num)) num++;
+    const t = { tid: `t${++tidSeq}`, app: appId, num };
+    openTabs.push(t);
+    activate(t.tid);
+    return t;
+  }
+  // Switch to the app's most recent tab, or open one if it is not open yet.
+  function openApp(appId) {
+    const t = tabById(lastTab[appId]) || openTabs.find((x) => x.app === appId);
+    if (t) activate(t.tid); else openNew(appId);
   }
 
-  function closeApp(id) {
-    const a = appById(id);
-    if (prefs.warn && frames.has(id) && !confirm(`Close ${a ? a.name : 'this tab'}?\n\nAnything you haven’t saved to your device will be lost.`)) return;
-    const idx = openIds.indexOf(id);
-    openIds = openIds.filter((x) => x !== id);
-    dropFrame(id);
-    if (active === id) activate(openIds[Math.min(idx, openIds.length - 1)] || 'home');
+  function closeApp(tid) {
+    const t = tabById(tid);
+    const a = t ? appById(t.app) : null;
+    if (prefs.warn && frames.has(tid) && !confirm(`Close ${t ? tabLabel(t, a) : 'this tab'}?\n\nAnything you haven’t saved to your device will be lost.`)) return;
+    const idx = openTabs.findIndex((x) => x.tid === tid);
+    openTabs = openTabs.filter((x) => x.tid !== tid);
+    dropFrame(tid);
+    if (active === tid) activate(openTabs[Math.min(idx, openTabs.length - 1)]?.tid || 'home');
     else { renderTabs(); saveSession(); }
   }
 
@@ -534,7 +583,7 @@
 
   $('#fitPref').addEventListener('change', (e) => { prefs.fit = e.target.checked; store.set('fit', prefs.fit); layoutAll(); });
 
-  function saveSession() { if (prefs.restore) store.set('session', { tabs: openIds, active }); }
+  function saveSession() { if (prefs.restore) store.set('session', { tabs: openTabs.map((t) => ({ tid: t.tid, app: t.app, num: t.num })), active, seq: tidSeq }); }
 
   window.addEventListener('beforeunload', (e) => {
     if (!prefs.warn || !frames.size) return undefined;
@@ -738,7 +787,12 @@
     if (!confirm(`Remove ${a.name}?\n\nIt will disappear from the hub for everyone. You can add it again later.`)) return;
     try {
       await api(`/api/admin/apps/${a.id}`, { method: 'DELETE' });
-      if (openIds.includes(a.id)) { dropFrame(a.id); openIds = openIds.filter((x) => x !== a.id); if (active === a.id) activate('home'); }
+      const gone = openTabs.filter((t) => t.app === a.id);
+      if (gone.length) {
+        for (const t of gone) dropFrame(t.tid);
+        openTabs = openTabs.filter((t) => t.app !== a.id);
+        if (active !== 'home' && !tabById(active)) activate('home'); else { renderTabs(); saveSession(); }
+      }
       toast(`Removed ${a.name}.`); await refreshAdmin();
     } catch (e) { toast(e.message); }
   }
@@ -802,9 +856,14 @@
     if (!ok) return;
     const s = prefs.restore ? store.get('session', null) : null;
     if (s && Array.isArray(s.tabs)) {
-      openIds = s.tabs.filter((id) => appById(id));
-      if (openIds.length) {
-        activate(openIds.includes(s.active) ? s.active : 'home');
+      tidSeq = Number(s.seq) || 0;
+      openTabs = s.tabs.map((x) => (typeof x === 'string' ? { app: x } : x)).filter((x) => x && appById(x.app))
+        .map((x) => ({ tid: typeof x.tid === 'string' && /^t\d+$/.test(x.tid) ? x.tid : `t${++tidSeq}`, app: x.app, num: Number(x.num) || 1 }));
+      for (const t of openTabs) tidSeq = Math.max(tidSeq, Number(t.tid.slice(1)) || 0);
+      if (openTabs.length) {
+        let want = s.active;
+        if (typeof want === 'string' && !tabById(want)) want = openTabs.find((t) => t.app === want)?.tid || 'home';
+        activate(want);
         toast(protectionState() === 'waiting' ? 'Reopened your tabs. Click anywhere to switch on the close warning, and open your files again if an app starts empty.' : 'Reopened your tabs. Open your files again if an app starts empty.');
         return;
       }

@@ -70,6 +70,7 @@
           <h1>What will you <span class="hl">craft</span> today?</h1>
           <p class="lede">Pick an app to open it in a tab. Switch between tabs without losing your place.</p>
         </header>
+        <div class="home-block" id="homeBlock">
         <div id="groups" aria-live="polite"></div>
         <p class="privacy">Your files stay on your device. Opening and saving happens in your browser, and nothing is uploaded to this server.</p>
         <fieldset class="prefs">
@@ -81,14 +82,20 @@
           <p class="note" id="storageNote"></p>
         </fieldset>
         <p class="contact" id="contact" hidden></p>
+        </div>
       </div>
     </section>
     <section class="appwin off" id="appwin" aria-label="Open app">
       <div class="appbar" id="appbar">
         <span class="appbar-info" id="appbarInfo"></span>
-        <button class="appbar-x" id="appbarClose" type="button" aria-label="Close app" title="Close app">
-          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-        </button>
+        <span class="appbar-btns">
+          <button class="appbar-x" id="appbarNew" type="button" aria-label="Open another in a new tab" title="Open another in a new tab">
+            <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </button>
+          <button class="appbar-x" id="appbarClose" type="button" aria-label="Close app" title="Close app">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </button>
+        </span>
       </div>
       <div id="frames"></div>
     </section>
@@ -111,10 +118,11 @@
       <h2 id="helpTitle">Help and information</h2>
       <button class="btn ghost" type="button" data-close>Close</button>
     </div>
-    <div class="prose">
+    <div class="prose dlg-body">
       <h3>Using the apps</h3>
       <ul>
         <li>Pick a tool on the Home tab to open it in a new tab. Switch between tabs whenever you like; each open app keeps its place.</li>
+        <li>Clicking an app on Home always opens it in a new tab, so you can have the same app open more than once (the tabs read WordCraft, WordCraft 2 and so on). The <strong>+</strong> in the app’s title bar opens another, and Shift-clicking an icon in the left column does too. Tabs of the same app share that app’s saved data in your browser, so save to files and be careful with apps that keep a library in the browser.</li>
         <li>While an app is open, the icons down the left side jump to any other app, and a green dot marks the ones already open. The list scrolls if there are many. Press the panel button at the top left to hide or show it; on small screens it opens over the app and closes when you pick one.</li>
         <li>On each tab, an open eye means that app is showing, and a crossed eye means it is hidden but still running (or not started yet, if the tab looks faded). The title bar above the app has a close button, and the logo takes you back Home without reloading.</li>
         <li>Open and save files from each app’s own menus. Files come from and go to your device, and nothing is uploaded to this server.</li>
@@ -194,7 +202,7 @@
       <h2 id="manageTitle">Manage apps</h2>
       <button class="btn ghost" id="manageClose" type="button">Close</button>
     </div>
-    <div id="loginView">
+    <div id="loginView" class="dlg-body">
       <form id="loginForm" autocomplete="off" novalidate>
         <p>Enter the admin token set in the container’s <code>ADMIN_TOKEN</code> variable.</p>
         <input class="sr-only" type="text" name="username" autocomplete="username" value="admin" tabindex="-1" aria-hidden="true">
@@ -205,7 +213,7 @@
         <p class="err" id="loginErr" role="alert"></p>
       </form>
     </div>
-    <div id="adminView" hidden>
+    <div id="adminView" class="dlg-body" hidden>
       <div class="row spread">
         <p class="note" id="adminNote"></p>
         <div class="row">
