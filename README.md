@@ -5,11 +5,12 @@ A small self-hosted launcher for the ArtCraft web apps (WordCraft, GridCraft, De
 - **Dark by default**, in a near-black palette with filled grey cards and one blue accent to sit alongside the ArtCraft apps, with a matching light theme toggle. The layout and text scale with the screen, and the header uses compact icon buttons (Help, theme, Manage).
 - **Works on phones and tablets.** Home is a single clear column on a phone. Apps get a larger virtual window scaled to fit the screen, with zoom (+ and −), a fit button, and a Move view mode for looking around when zoomed in. Switch it off under Preferences if you prefer apps at their normal size.
 - **Tabs stay alive** while you switch between apps, so nothing reloads or loses state.
-- **Several tabs of one app.** Clicking an app on Home always opens a new tab, so the same app can be open more than once (WordCraft, WordCraft 2, …). The **+** in the title bar and Shift-click on a rail icon do the same. Tabs of one app share that app's saved browser data, so save to files and take care with apps that keep a library in the browser.
+- **Several tabs of one app.** Clicking an app on Home always opens a new tab, so the same app can be open more than once (WordCraft, WordCraft 2, …). The **+** in the title bar and Shift-click on a rail icon do the same.
+- **Launcher rail.** While an app is open, a scrollable column of app icons on the left switches between apps. It can be hidden, and on phones it becomes a drawer opened from the top-left button. Tabs show whether each app is showing or running in the background, and the open app sits in a framed window with a title bar (icon, name, version, new tab, close).
 - **Home grid fits the screen.** Groups share the same columns, as many as fit (4, 5 or more on wide screens, limited by the biggest group), and the whole block stays centred.
-- **Launcher rail.** While an app is open, a scrollable column of app icons on the left switches between apps. It can be hidden, and on phones it becomes a drawer opened from the top-left button. Tabs show whether each app is showing or running in the background, and the open app sits in a framed window with a title bar (icon, name, version, close).
 - **Warns before you close the page** while apps are open, and **reopens your tabs** after a refresh or crash.
 - **Updates itself.** The container checks each app's GitHub releases every few hours and installs new versions without a restart. Visitors see a banner offering to refresh.
+- **Progress you can hide.** While an app installs or updates, a card at the bottom-left shows what is happening with a moving progress bar. Hide it and carry on working; it comes back to say the app is ready, or why it could not be installed.
 - **Checks what it installs.** Every download is verified before use. Misplaced files are moved into place, and if the newest release is broken the hub keeps or installs the newest one that works and tells you why in Manage.
 - **Manage panel** to add, edit, remove and update apps, switch automatic updates on or off per app, pin an app to a version, rename groups, choose group colours, and set an optional contact line for the home page footer. It needs your admin token.
 - **Explains failures.** If an app cannot start, a bar above it says why. The Help button covers using the apps, fixing problems, adding apps and the limitations.
@@ -60,11 +61,11 @@ The apps every new install starts with are listed in **`default-apps.json`**. Ed
 - **New installs** get the whole list.
 - **Existing installs** get any *new* app you add to the list the next time the container starts. An app the owner removed stays removed. Changes to an app that is already installed (its group, name or description) are not pushed, because the owner may have customised them. They use Manage → Edit instead.
 - To change an app's description for existing installs too, add the old text to that entry's `oldDescriptions` list, as WordCraft does. Installs that still have the old, unedited text pick up the new one, and descriptions an owner has changed are left alone.
-- Group **colours** are chosen in Manage → Group colours, per install.
+- Group **colours** are chosen in Manage → Groups, per install. Colours are only kept for groups that still have apps.
 
 ## Adding and updating apps
 
-In **Manage**, enter a GitHub repository such as `storytold/photocraft`, optionally with a group, description, release file pattern and icon address.
+In **Manage**, enter a GitHub repository such as `storytold/photocraft`, optionally with a group, description, release file pattern and icon address. The Group box suggests only the groups that exist now, and you can type a new one.
 
 **How the hub finds and checks the web build**
 
@@ -74,9 +75,11 @@ In **Manage**, enter a GitHub repository such as `storytold/photocraft`, optiona
 
 **Updates and versions** (per app, in Manage)
 
-- **Update automatically** (on by default). When off, the app stays on its installed version. Manage and the home page show an "update available" arrow, and you press **Update to …** when ready.
+- **Update automatically** (on by default). When off, the app stays on its installed version. Manage and the home page show an "update available" chip, and you press **Update to …** when ready.
 - **Pin this version** holds an app on the version chosen in its list, even an older one, until you unpin it. Pinned apps never change on their own, but still show when something newer exists.
 - **Check now** looks for a newer release immediately.
+
+**Progress notices.** Adding, updating, pinning or checking an app starts a card at the bottom-left of the page: *Installing / Updating / Checking*, with what it is doing now (looking for a release, downloading, unpacking and checking). Press the cross to hide it; the work carries on, and the card returns when it finishes with **Open** (new install), **Refresh** (update to an app you have open), or the reason and an **Open Manage** button if it failed. Visitors see the same card while an update downloads, so they know a refresh is coming.
 
 **Icons** are taken, in order, from: an icon address you set, the app's own page (apple-touch-icon or manifest), well-known paths in the repository, the first logo image in the README, then a scored search of the repository's image files. If none is found a lettered tile is shown, and you can set an icon address with **Edit**.
 
@@ -92,8 +95,57 @@ If something fails, the in-app **Help** button lists what visitors can try, and 
 ## Things to know
 
 - **Apps share one origin.** Each app runs in an iframe at `/apps/<name>/` on the same domain. That keeps the file picker working and lets tabs share the page, but all apps then share the browser's localStorage and IndexedDB for your domain. If two apps use the same storage key they could overwrite each other. If you see that, the fix is to serve each app on its own subdomain.
+- **Several tabs of one app share that app's saved data.** Save to files, and take care with apps that keep a library in the browser.
 - **Treat releases as trusted code.** Because of the shared origin, an app can in principle see the dashboard's storage. Only add repositories you trust. The admin token is kept in memory only and is never written to browser storage.
 - **Crash recovery has limits.** The hub remembers which tabs were open. What is inside each document is up to the app: it survives a crash only if that app autosaves to browser storage. Saving to a file on the device is the only guarantee.
 - **Close warnings depend on the browser.** Browsers show the warning only after you have clicked or typed on the page, most phone browsers never show it, and none can warn on a crash or shutdown. Preferences on the Home tab says whether it is active. Background-tab sleeping (Chrome's Memory Saver, Edge's sleeping tabs) can unload apps silently, so add the site to the always-active list.
 - **The "unsaved changes" warning is generic.** Browsers do not let a page see what is unsaved inside an app, so the warning appears whenever any app tab is open. It cannot fire if the browser itself crashes.
 - **Memory.** Every open tab is a running WebAssembly app in the visitor's browser. Tabs restored after a refresh load only when clicked.
+
+## Screenshots
+
+The app windows in these screenshots are placeholders, so the hub's own interface is the focus.
+
+### Dark and light
+
+Each pair shows the dark theme above the light theme.
+
+<img src="docs/screenshots/compare-home.png" alt="Home page, dark above and light below" width="900">
+
+<img src="docs/screenshots/compare-app.png" alt="An app open with the launcher rail, dark above and light below" width="900">
+
+<img src="docs/screenshots/compare-manage.png" alt="The Manage panel, dark above and light below" width="900">
+
+### Home and wide screens
+
+Groups share the same columns, so tiles line up, and the grid uses as many columns as the screen allows.
+
+<img src="docs/screenshots/wide-screen.png" alt="Home page on a wide screen with five columns" width="900">
+
+### Working in an app
+
+The launcher rail on the left switches apps, the tabs show what is showing or running in the background, and the framed window has a title bar with a button to open another tab of the same app.
+
+<img src="docs/screenshots/app-dark.png" alt="An app open in the dark theme" width="900">
+
+<img src="docs/screenshots/multiple-tabs.png" alt="Two tabs of one app and a second app, with a count on the launcher icon" width="900">
+
+### Manage and Help
+
+<img src="docs/screenshots/signin.png" alt="The sign-in prompt, dark and light" width="620">
+
+<img src="docs/screenshots/manage-groups-dark.png" alt="Manage: group renaming and colours, then the add-an-app form" width="900">
+
+<img src="docs/screenshots/help.png" alt="The Help and information panel" width="760">
+
+### Phones and tablets
+
+<img src="docs/screenshots/tablet.png" alt="An app on a tablet with zoom controls" width="420">
+
+<img src="docs/screenshots/mobile.png" alt="Phone: home, an app with the launcher collapsed, and the launcher drawer open" width="900">
+
+### Install and update notices
+
+<img src="docs/screenshots/install-notices.png" alt="The progress card while installing, when ready, and if it fails" width="420">
+
+<img src="docs/screenshots/notice-in-context.png" alt="The ready notice at the bottom-left over an open app" width="900">
