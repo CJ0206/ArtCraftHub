@@ -143,12 +143,13 @@
     apps = data.apps || [];
     categories = data.categories || {};
     site = data.site || { contact: null };
+    for (const a of apps) if (a.updating && !jobs.has(a.id)) trackJob(a.id, a.name, 'update', a.version); // an update is running right now
     checkForChanges();
     const sig = JSON.stringify([apps, categories, site]);
     if (sig !== lastSig) { lastSig = sig; renderHome(); renderTabs(); renderContact(); }
     return true;
   }
-  setInterval(() => { if (!document.hidden) loadApps(); }, 5 * 60 * 1000);
+  setInterval(() => { if (!document.hidden) loadApps(); }, 60 * 1000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - lastPoll > 60 * 1000) loadApps(); });
 
   // ---------- home ----------
@@ -659,11 +660,10 @@
     return data;
   }
 
-  function showAdmin(on) { $('#loginView').hidden = on; $('#adminView').hidden = !on; }
+  function showAdmin(on) { $('#loginView').hidden = on; $('#adminView').hidden = !on; dlg.classList.toggle('signin', !on); }
 
   $('#manageBtn').addEventListener('click', () => { dlg.showModal(); if (token) refreshAdmin().catch(() => showAdmin(false)); else { showAdmin(false); $('#tokenInput').focus(); } });
   $('#manageClose').addEventListener('click', () => dlg.close());
-  $('#howBtn').addEventListener('click', () => $('#helpDlg').showModal());
   dlg.addEventListener('close', () => { clearInterval(pollTimer); pollTimer = null; loadApps(); });
   $('#loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -685,7 +685,8 @@
     renderAdminList(data.apps);
     renderCategoryEditor(data.apps);
     fillSiteForm(data.settings || {});
-    $('#catList').replaceChildren(...catOrder(new Set(['Office', 'Create', 'Other', ...data.apps.map((a) => a.category).filter(Boolean)])).map((c) => h('option', { value: c })));
+    // suggestions are only the groups that exist now, so renamed or emptied groups disappear
+    $('#catList').replaceChildren(...catOrder(new Set(data.apps.map((a) => a.category).filter(Boolean))).map((c) => h('option', { value: c })));
     const busy = data.apps.some((a) => a.installing);
     if (busy && !pollTimer) pollTimer = setInterval(() => refreshAdmin().catch(() => {}), 3000);
     if (!busy && pollTimer) { clearInterval(pollTimer); pollTimer = null; }
@@ -732,8 +733,11 @@
   function renderAdminList(list) { $('#adminList').replaceChildren(...list.map(appCard)); }
 
   async function postSettings(a, body, message) {
-    try { await api(`/api/admin/apps/${a.id}/settings`, { method: 'POST', body: JSON.stringify(body) }); toast(message); }
-    catch (e) { toast(e.message); }
+    try {
+      const res = await api(`/api/admin/apps/${a.id}/settings`, { method: 'POST', body: JSON.stringify(body) });
+      toast(message);
+      if (res.app && res.app.installing) trackJob(a.id, a.name, 'update', a.version);
+    } catch (e) { toast(e.message); }
     await refreshAdmin().catch(() => {});
   }
 
@@ -780,7 +784,7 @@
   }
 
   async function updateOne(a) {
-    try { await api(`/api/admin/apps/${a.id}/update`, { method: 'POST', body: '{}' }); toast(`Checking ${a.name}…`); await refreshAdmin(); }
+    try { await api(`/api/admin/apps/${a.id}/update`, { method: 'POST', body: '{}' }); trackJob(a.id, a.name, a.updateAvailable && !a.pin ? 'update' : 'check', a.version); await refreshAdmin(); }
     catch (e) { toast(e.message); }
   }
   async function removeApp(a) {
@@ -823,8 +827,10 @@
       description: $('#fDesc').value, assetPattern: $('#fPattern').value, iconUrl: $('#fIcon').value,
     };
     try {
-      await api('/api/admin/apps', { method: 'POST', body: JSON.stringify(body) });
-      toast(editingId ? 'Saved.' : 'Added. Downloading the newest working release…');
+      const res = await api('/api/admin/apps', { method: 'POST', body: JSON.stringify(body) });
+      const before = editingId ? lastAdminList.find((x) => x.id === editingId) : null;
+      toast(editingId ? 'Saved.' : 'Added.');
+      if (res.app && res.app.installing) trackJob(res.app.id, res.app.name || body.name, editingId ? 'update' : 'install', before ? before.version : null);
       resetForm(); await refreshAdmin();
       $('#appsHeading').scrollIntoView(smooth());
     } catch (e) { $('#formErr').textContent = e.message; }
@@ -833,6 +839,113 @@
     try { await api('/api/admin/check', { method: 'POST', body: '{}' }); toast('Checking every app for updates…'); setTimeout(() => refreshAdmin().catch(() => {}), 1500); }
     catch (e) { toast(e.message); }
   });
+
+  // ---------- install and update progress ----------
+  // A card at the bottom-left that never blocks the page. It can be hidden while the work carries
+  // on, and it comes back to say when the app is ready (or why it was not).
+  const jobs = new Map();       // app id -> { name, kind: 'install' | 'update' | 'check', from, phase: 'working' | 'done' | 'failed', ... }
+  let jobTimer = null;
+
+  const spinnerIcon = () => icon([['path', { d: 'M12 3a9 9 0 1 0 9 9', 'stroke-width': '2.2' }]], 20, { class: 'spin' });
+  const checkIcon = () => icon([['path', { d: 'M5 12.5l4.5 4.5L19 7.5', 'stroke-width': '2.4' }]], 20, { class: 'draw' });
+  const warnIcon = () => icon([['path', { d: 'M12 4l9 16H3zM12 10v4.5M12 17.6v.1' }]], 20);
+
+  function trackJob(id, name, kind, from = null) {
+    const old = jobs.get(id);
+    if (old) { old.el?.remove(); clearTimeout(old.timer); }
+    jobs.set(id, { name, kind, from, phase: 'working', hidden: false, started: Date.now(), detail: kind === 'check' ? 'Looking for the newest release…' : 'Starting…' });
+    renderTray(); ensureJobPoll();
+  }
+  const jobTitle = (j) => (j.phase === 'working'
+    ? (j.kind === 'install' ? `Installing ${j.name}` : j.kind === 'update' ? `Updating ${j.name}` : `Checking ${j.name}`)
+    : j.phase === 'done' ? j.title : `${j.name} couldn’t be ${j.kind === 'install' ? 'installed' : 'updated'}`);
+
+  function hideJob(id) {
+    const j = jobs.get(id);
+    if (!j) return;
+    if (j.phase === 'working') { j.hidden = true; j.el?.remove(); j.el = null; }   // keep working; the result will show again
+    else { j.el?.remove(); clearTimeout(j.timer); jobs.delete(id); }
+  }
+
+  function buildCard(id, j) {
+    const actions = [];
+    if (j.phase === 'done' && j.kind === 'install') actions.push(h('button', { class: 'btn solid', type: 'button', onclick: () => { hideJob(id); if (appById(id)) openNew(id); } }, 'Open'));
+    if (j.phase === 'done' && j.kind !== 'install' && openTabs.some((t) => t.app === id)) actions.push(h('button', { class: 'btn solid', type: 'button', onclick: () => location.reload() }, 'Refresh'));
+    if (j.phase === 'failed' && token) actions.push(h('button', { class: 'btn', type: 'button', onclick: () => { hideJob(id); dlg.showModal(); refreshAdmin().catch(() => showAdmin(false)); } }, 'Open Manage'));
+    j.tEl = h('strong', { text: jobTitle(j) });
+    j.dEl = h('small', { text: j.detail || '' });
+    return h('div', {
+      class: `job ${j.phase}`, role: 'status',
+      onmouseenter: () => { j.hover = true; }, onmouseleave: () => { j.hover = false; },
+    },
+      h('span', { class: 'job-ico' }, j.phase === 'working' ? spinnerIcon() : j.phase === 'done' ? checkIcon() : warnIcon()),
+      h('div', { class: 'job-text' }, j.tEl, j.dEl),
+      h('button', { class: 'job-x', type: 'button', 'aria-label': j.phase === 'working' ? 'Hide this notice. The work carries on.' : 'Dismiss', title: j.phase === 'working' ? 'Hide (it keeps working)' : 'Dismiss', onclick: () => hideJob(id) }, icon(CLOSE, 14)),
+      actions.length ? h('div', { class: 'job-actions' }, actions) : null,
+      j.phase === 'working' ? h('span', { class: 'job-bar' }, h('i')) : null);
+  }
+
+  // Cards are updated in place, so the spinner and bar keep animating between checks.
+  function renderTray() {
+    for (const [id, j] of jobs) {
+      if (j.hidden) continue;
+      if (!j.el) { j.el = buildCard(id, j); j.shown = j.phase; $('#tray').append(j.el); }
+      else if (j.shown !== j.phase) { const el = buildCard(id, j); j.el.replaceWith(el); j.el = el; j.shown = j.phase; }
+      else { j.tEl.textContent = jobTitle(j); j.dEl.textContent = j.detail || ''; }
+    }
+  }
+
+  function ensureJobPoll() {
+    if (!jobTimer) jobTimer = setInterval(pollJobs, 2000);
+    setTimeout(pollJobs, 700);
+  }
+  const phaseText = (a, admin) => {
+    const tag = (admin ? a.phaseTag : a.updatingTo) || '';
+    if (admin && a.phase === 'downloading') return `Downloading ${tag}…`;
+    if (admin && a.phase === 'installing') return `Checking and unpacking ${tag}…`;
+    return admin ? 'Looking for the newest release…' : `Installing ${tag}…`;
+  };
+
+  async function pollJobs() {
+    const working = [...jobs].filter(([, j]) => j.phase === 'working');
+    if (!working.length) { clearInterval(jobTimer); jobTimer = null; return; }
+    let list;
+    try {
+      list = token ? (await api('/api/admin/apps')).apps : (await (await fetch('/api/apps', { cache: 'no-store' })).json()).apps;
+    } catch { return; }
+    for (const [id, j] of working) {
+      const a = list.find((x) => x.id === id);
+      const age = Date.now() - j.started;
+      if (!a) { if (age > 5000) { j.el?.remove(); jobs.delete(id); } continue; }
+      if (token ? a.installing : a.updating) { j.detail = phaseText(a, Boolean(token)); renderTray(); continue; }
+      if (age < 1200) continue;               // give the server a moment to register the work
+      await finishJob(id, a);
+    }
+  }
+
+  async function finishJob(id, a) {
+    const j = jobs.get(id);
+    if (!j) return;
+    const admin = Boolean(token);
+    if (!admin && j.from === a.version) { j.el?.remove(); jobs.delete(id); return; }   // nothing changed, nothing to say
+    if (admin && a.error) {
+      j.phase = 'failed'; j.detail = String(a.error).slice(0, 220);
+    } else if (!a.version) {
+      j.phase = 'failed'; j.detail = 'It has not been installed yet.';
+    } else {
+      j.phase = 'done';
+      if (j.kind === 'install' || !j.from) { j.title = `${j.name} is ready`; j.detail = `Version ${a.version} is installed. It is on the home page now.`; }
+      else if (j.from !== a.version) { j.title = `${j.name} updated to ${a.version}`; j.detail = openTabs.some((t) => t.app === id) ? 'Save your work, then refresh to use the new version in open tabs.' : 'It is ready to open.'; }
+      else { j.title = `${j.name} is up to date`; j.detail = `Version ${a.version} is the newest one that works here.`; }
+    }
+    j.hidden = false;                          // show the result even if the card was hidden while working
+    await loadApps();
+    renderTray();
+    if (j.phase === 'done') {
+      const later = () => { if (!jobs.has(id)) return; if (j.hover) { j.timer = setTimeout(later, 3000); return; } j.el?.remove(); jobs.delete(id); };
+      j.timer = setTimeout(later, 10000);
+    }
+  }
 
   // ---------- home page footer settings ----------
   function fillSiteForm(s) {

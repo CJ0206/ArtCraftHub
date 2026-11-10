@@ -99,6 +99,7 @@
       </div>
       <div id="frames"></div>
     </section>
+    <div class="tray" id="tray" aria-live="polite"></div>
     <div class="viewbar" id="viewbar" role="toolbar" aria-label="View controls" hidden>
       <span class="vb-controls" id="vbControls">
         <button id="vbOut" type="button" aria-label="Zoom out" title="Zoom out">&minus;</button>
@@ -128,8 +129,9 @@
         <li>Open and save files from each app’s own menus. Files come from and go to your device, and nothing is uploaded to this server.</li>
         <li>Save to a file often. Browser storage is not a backup, and a crash or cleared browser data can lose unsaved work.</li>
         <li>You are warned before closing the page or an app tab while apps are open. You can turn that off, and tab restoring too, under Preferences on the Home tab, which also says whether the warning is active.</li>
+        <li>When an app is being installed or updated, a small card at the bottom-left shows what is happening. You can hide it and carry on working; it comes back to tell you when the app is ready, or why it could not be installed.</li>
         <li>A banner offers a refresh when an app is added, updated or removed. Save your work first, because refreshing restarts the open apps.</li>
-        <li>A small arrow beside a version number means a newer version exists that the site owner has not installed yet.</li>
+        <li>An <strong>Update</strong> tag on an app tile means a newer version exists that the site owner has not installed yet.</li>
       </ul>
 
       <h3>Keeping your work safe</h3>
@@ -171,7 +173,7 @@
       <ol>
         <li>Press <strong>Manage</strong> and sign in with the admin token.</li>
         <li>Under <strong>Add an app</strong>, enter the project’s GitHub address, such as <code>owner/name</code>. Optionally choose a group, a short description, a release file pattern or an icon address.</li>
-        <li>Press <strong>Add app</strong>. The server finds the project’s releases, downloads the newest web build that works, and adds a tile. This usually takes under a minute, and the list shows progress or the reason it failed.</li>
+        <li>Press <strong>Add app</strong>. The server finds the project’s releases, downloads the newest web build that works, and adds a tile. This usually takes under a minute. A card at the bottom-left shows progress, so you can close Manage and keep working, and it tells you when the app is ready or why it failed.</li>
         <li>After that the server checks for new releases by itself. Each app has an <strong>Update automatically</strong> switch. When it is off, the list shows that an update is available and you press <strong>Update</strong> when you are ready.</li>
         <li>To stay on a particular version, choose it in the version list and press <strong>Pin</strong>. A pinned app never changes until you unpin it, but the list still tells you when something newer exists.</li>
         <li>Under <strong>Groups</strong> you can rename a group, which moves every app in it, and choose its colour. Use <strong>Edit</strong> on an app to change its details.</li>
@@ -217,7 +219,6 @@
       <div class="row spread">
         <p class="note" id="adminNote"></p>
         <div class="row">
-          <button class="btn" id="howBtn" type="button">How adding apps works</button>
           <button class="btn" id="checkAllBtn" type="button">Check for updates</button>
           <button class="btn ghost" id="logoutBtn" type="button">Sign out</button>
         </div>
@@ -235,7 +236,7 @@
         <div class="form" id="addForm">
           <label>GitHub repository<input id="fRepo" placeholder="owner/name or https://github.com/owner/name"></label>
           <label>Name<input id="fName" placeholder="Shown on the card"></label>
-          <label>Group<input id="fCat" placeholder="Office, Create, Other…" list="catList"></label>
+          <label>Group<input id="fCat" placeholder="Choose a group or type a new one" list="catList" autocomplete="off"></label>
           <datalist id="catList"></datalist>
           <label>Description<input id="fDesc" placeholder="One short line"></label>
           <label>Release file pattern <span class="hint">(optional)</span><input id="fPattern" placeholder="-web-.*\.zip$"></label>

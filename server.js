@@ -107,6 +107,15 @@ async function init() {
     if (a && a.description !== d.description && d.oldDescriptions.includes(a.description)) { a.description = d.description; reworded++; }
   }
   if (reworded) { await saveApps(); log(`Updated ${reworded} default description(s)`); }
+  await pruneCategories();
+}
+
+// Colours are kept only for groups that still have apps, so renamed or emptied groups do not linger.
+async function pruneCategories() {
+  const used = new Set(apps.map((a) => a.category || 'Other'));
+  let changed = false;
+  for (const k of Object.keys(categories)) if (!used.has(k)) { delete categories[k]; changed = true; }
+  if (changed) await saveCategories();
 }
 
 // ---------- validation ----------
@@ -314,13 +323,19 @@ async function precompress(dir) {
 }
 
 // ---------- installing one release ----------
+// What each app is doing right now, so the page can show progress. Memory only.
+const activity = new Map(); // id -> { phase: 'checking' | 'downloading' | 'installing', tag }
+const setPhase = (id, phase, tag) => activity.set(id, { phase, tag: tag ?? activity.get(id)?.tag ?? null });
+
 async function installRelease(app, rel) {
   const work = path.join(TMP_DIR, `${app.id}-${Date.now()}`);
   try {
     await fsp.mkdir(work, { recursive: true });
     const zipPath = path.join(work, 'asset.zip');
     log(`[${app.id}] downloading ${rel.tag} (${rel.pick.name})`);
+    setPhase(app.id, 'downloading', rel.tag);
     await download(rel.pick.browser_download_url, zipPath);
+    setPhase(app.id, 'installing', rel.tag);
 
     const extracted = path.join(work, 'x');
     await fsp.mkdir(extracted);
@@ -525,6 +540,7 @@ const installing = new Set();
 async function syncApp(app, opts = {}) {
   if (installing.has(app.id)) return 'busy';
   installing.add(app.id);
+  setPhase(app.id, 'checking');
   const st = (state[app.id] ||= {});
   try {
     await fsp.mkdir(path.join(APPS_DIR, app.id), { recursive: true });
@@ -586,6 +602,7 @@ async function syncApp(app, opts = {}) {
     return 'error';
   } finally {
     installing.delete(app.id);
+    activity.delete(app.id);
     await saveState().catch(() => {});
   }
 }
@@ -711,6 +728,8 @@ const publicView = (a) => {
     version: s.version || null, updatedAt: s.installedAt || null,
     icon: Boolean(findIcon(a.id)), iconV: s.iconAt || 0,
     updateAvailable: updateAvailable(a.id), latest: s.latest || null,
+    // true only while a new version is downloading or being installed, not during a routine check
+    updating: ['downloading', 'installing'].includes(activity.get(a.id)?.phase), updatingTo: activity.get(a.id)?.tag || null,
   };
 };
 const adminView = (a) => {
@@ -719,6 +738,7 @@ const adminView = (a) => {
   return {
     ...a, ...publicView(a), installed: isInstalled(a.id), installing: installing.has(a.id),
     autoUpdate: a.autoUpdate !== false, pin: a.pin || null,
+    phase: activity.get(a.id)?.phase || null, phaseTag: activity.get(a.id)?.tag || null,
     checkedAt: s.checkedAt || null, error: s.error || null, asset: s.asset || null,
     releases: s.releases || [], badTags: Object.keys(s.bad || {}),
     warning: latestIssue && s.version ? `Running ${s.version} because the newest release (${s.latest}) can't run here. ${latestIssue}` : null,
@@ -784,6 +804,7 @@ async function handleAdmin(req, res, url) {
         Object.assign(existing, next);
       } else apps.push(next);
       await saveApps();
+      await pruneCategories();
       const app = existing || next;
       if (!existing || before.repo !== repo || (before && before.assetPattern !== next.assetPattern) || !isInstalled(newId)) syncApp(app, { reinstall: true });
       else if (before && before.iconUrl !== next.iconUrl) ensureIcon(app, { force: true }).then(() => saveState().catch(() => {}));
@@ -795,6 +816,7 @@ async function handleAdmin(req, res, url) {
       apps = apps.filter((a) => a.id !== id);
       delete state[id]; missingLog.delete(id);
       await Promise.all([saveApps(), saveState()]);
+      await pruneCategories();
       await fsp.rm(path.join(APPS_DIR, id), { recursive: true, force: true });
       return sendJson(res, 200, { ok: true });
     }
@@ -842,6 +864,7 @@ async function handleAdmin(req, res, url) {
       if (from !== to && categories[from] && !categories[to]) categories[to] = categories[from];
       if (from !== to) delete categories[from];
       await Promise.all([saveApps(), saveCategories()]);
+      await pruneCategories();
       return sendJson(res, 200, { categories: catsView(), moved });
     }
 
