@@ -112,11 +112,9 @@ The app windows in these screenshots are placeholders, so the hub's own interfac
 
 Each pair shows the dark theme above the light theme.
 
-<img src="docs/screenshots/compare-home.png" alt="Home page, dark above and light below" width="900">
-
-<img src="docs/screenshots/compare-app.png" alt="An app open with the launcher rail, dark above and light below" width="900">
-
-<img src="docs/screenshots/compare-settings.png" alt="The Settings screen, dark above and light below" width="900">
+| Home | App | Settings |
+| --- | --- | --- |
+| <img src="docs/screenshots/compare-home.png" alt="Home page, dark above and light below" width="900"> | <img src="docs/screenshots/compare-app.png" alt="An app open with the launcher rail, dark above and light below" width="900"> | <img src="docs/screenshots/compare-settings.png" alt="The Settings screen, dark above and light below" width="900"> |
 
 ### Home and wide screens
 
@@ -128,25 +126,21 @@ Groups share the same columns, so tiles line up, and the grid uses as many colum
 
 The launcher rail on the left switches apps, the tabs show what is showing or running in the background, and the framed window has a title bar with a button to open another tab of the same app.
 
-<img src="docs/screenshots/app-dark.png" alt="An app open in the dark theme" width="900">
-
-<img src="docs/screenshots/multiple-tabs.png" alt="Two tabs of one app and a second app, with a count on the launcher icon" width="900">
+| One app | Two of the same app |
+| --- | --- |
+| <img src="docs/screenshots/app-dark.png" alt="An app open in the dark theme" width="900"> | <img src="docs/screenshots/multiple-tabs.png" alt="Two tabs of one app and a second app, with a count on the launcher icon" width="900"> |
 
 ### Settings
 
 Settings opens as its own tab, from the gear in the header or at the bottom of the rail. **Preferences** are for every visitor; the admin pages appear after **Admin sign-in**.
 
-<img src="docs/screenshots/settings-with-app.png" alt="The Settings tab beside an open app, showing Preferences" width="900">
+| Preferences | Admin Sign-in | App Management |
+| --- | --- | --- |
+| <img src="docs/screenshots/settings-with-app.png" alt="The Settings tab beside an open app, showing Preferences" width="900"> | <img src="docs/screenshots/settings-signin-dark.png" alt="Admin sign-in page" width="900"> | <img src="docs/screenshots/settings-apps-dark.png" alt="The Apps admin page with an available update and a pinned app" width="900"> |
 
-<img src="docs/screenshots/settings-signin-dark.png" alt="Admin sign-in page" width="900">
-
-<img src="docs/screenshots/settings-apps-dark.png" alt="The Apps admin page with an available update and a pinned app" width="900">
-
-<img src="docs/screenshots/settings-edit-dark.png" alt="The Add or edit an app page" width="900">
-
-<img src="docs/screenshots/settings-groups-dark.png" alt="The Groups page: rename groups and choose colours" width="900">
-
-<img src="docs/screenshots/settings-footer-dark.png" alt="The Home page footer page" width="900">
+| Add / Edit Apps | Group Settings | Footer Settings |
+| --- | --- | --- |
+| <img src="docs/screenshots/settings-edit-dark.png" alt="The Add or edit an app page" width="900"> | <img src="docs/screenshots/settings-groups-dark.png" alt="The Groups page: rename groups and choose colours" width="900"> | <img src="docs/screenshots/settings-footer-dark.png" alt="The Home page footer page" width="900"> |
 
 ### Help
 
