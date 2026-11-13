@@ -33,9 +33,9 @@
         <svg class="i-moon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M20 14.2A8.2 8.2 0 0 1 9.8 4 8.2 8.2 0 1 0 20 14.2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
         <span class="lbl" id="themeLbl"></span>
       </button>
-      <button class="btn ghost" id="manageBtn" type="button" aria-label="Manage apps" title="Manage apps">
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="15" cy="7" r="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="17" r="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
-        <span class="lbl">Manage</span>
+      <button class="btn ghost" id="manageBtn" type="button" aria-label="Settings" title="Settings">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/><circle cx="12" cy="12" r="3"/></svg>
+        <span class="lbl">Settings</span>
       </button>
     </div>
   </header>
@@ -51,6 +51,9 @@
   <main id="stage">
     <nav class="rail" id="rail" aria-label="Launch an app" hidden>
       <div class="rail-list" id="railList"></div>
+      <div class="rail-foot">
+        <button class="rail-btn" id="railSettings" type="button" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      </div>
     </nav>
     <div class="rail-scrim" id="railScrim" hidden></div>
     <div class="stage-main">
@@ -73,14 +76,6 @@
         <div class="home-block" id="homeBlock">
         <div id="groups" aria-live="polite"></div>
         <p class="privacy">Your files stay on your device. Opening and saving happens in your browser, and nothing is uploaded to this server.</p>
-        <fieldset class="prefs">
-          <legend>Preferences</legend>
-          <label><input type="checkbox" id="warnPref"> Warn me before closing this page or an app tab</label>
-          <p class="note" id="closeNote"></p>
-          <label><input type="checkbox" id="restorePref"> Reopen my tabs when I come back</label>
-          <label><input type="checkbox" id="fitPref"> Fit apps to small screens, with zoom and move controls</label>
-          <p class="note" id="storageNote"></p>
-        </fieldset>
         <p class="contact" id="contact" hidden></p>
         </div>
       </div>
@@ -98,6 +93,122 @@
         </span>
       </div>
       <div id="frames"></div>
+    </section>
+    <section class="appwin setwin" id="settingsWin" aria-label="Settings" hidden>
+      <div class="appbar">
+        <span class="appbar-info"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/><circle cx="12" cy="12" r="3"/></svg><span class="nm">Settings</span></span>
+        <button class="appbar-x" id="settingsClose" type="button" aria-label="Close settings" title="Close settings">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <div class="set-body">
+        <nav class="set-nav" id="setNav" aria-label="Settings sections"></nav>
+        <div class="set-main" id="setMain">
+
+          <section class="set-page" data-page="prefs" hidden>
+            <p class="eyebrow">General</p>
+            <h2 class="set-title"><b>Preferences</b> <span>for this browser</span></h2>
+            <div class="set-note"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.1"/></svg><p>These are saved in this browser only and apply to you, not to other visitors. Your files stay on your device: opening and saving happens in your browser, and nothing is uploaded to this server.</p></div>
+            <h3>Appearance</h3>
+            <div class="set-card">
+              <div class="seg" role="group" aria-label="Theme">
+                <button type="button" data-theme-opt="dark" aria-pressed="true">Dark</button>
+                <button type="button" data-theme-opt="light" aria-pressed="false">Light</button>
+              </div>
+            </div>
+            <h3>Closing and reopening</h3>
+            <div class="set-card">
+              <label class="check"><input type="checkbox" id="warnPref"> Warn me before closing this page or an app tab</label>
+              <p class="note" id="closeNote"></p>
+              <label class="check"><input type="checkbox" id="restorePref"> Reopen my tabs when I come back</label>
+            </div>
+            <h3>Small screens</h3>
+            <div class="set-card">
+              <label class="check"><input type="checkbox" id="fitPref"> Fit apps to small screens, with zoom and move controls</label>
+            </div>
+            <p class="note" id="storageNote"></p>
+          </section>
+
+          <section class="set-page" data-page="about" hidden>
+            <p class="eyebrow">General</p>
+            <h2 class="set-title"><b>Help</b> <span>and about</span></h2>
+            <div class="set-card">
+              <p>New here? The help guide covers using the apps, fixing problems, adding apps and what the hub can and cannot do.</p>
+              <button class="btn solid" id="openHelpBtn" type="button">Open the help guide</button>
+            </div>
+            <div class="set-note"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><p>The site owner signs in under <strong>Admin</strong> to add, update and remove apps. Visitors only see the preferences on this screen.</p></div>
+          </section>
+
+          <section class="set-page" data-page="signin" hidden>
+            <p class="eyebrow">Admin</p>
+            <h2 class="set-title"><b>Admin</b> <span>sign-in</span></h2>
+            <div class="set-note"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><p>Only the site owner needs this. Signing in unlocks adding, updating and removing apps, group names and colours, and the home page footer. The token is the <code>ADMIN_TOKEN</code> set on the container, and it is kept in memory only.</p></div>
+            <form id="loginForm" class="set-card" autocomplete="off" novalidate>
+              <label for="tokenInput" class="lbl-strong">Admin token</label>
+              <input class="sr-only" type="text" name="username" autocomplete="username" value="admin" tabindex="-1" aria-hidden="true">
+              <div class="row">
+                <input id="tokenInput" type="password" autocomplete="off" placeholder="Admin token">
+                <button class="btn solid" id="loginBtn" type="submit">Sign in</button>
+              </div>
+              <p class="err" id="loginErr" role="alert"></p>
+            </form>
+          </section>
+
+          <section class="set-page" data-page="apps" hidden>
+            <p class="eyebrow">Admin</p>
+            <h2 class="set-title"><b>Apps</b> <span>and updates</span></h2>
+            <div class="row spread">
+              <p class="note" id="adminNote"></p>
+              <button class="btn" id="checkAllBtn" type="button">Check for updates</button>
+            </div>
+            <ul class="applist" id="adminList"></ul>
+          </section>
+
+          <section class="set-page" data-page="addapp" hidden>
+            <p class="eyebrow">Admin</p>
+            <h2 class="set-title" id="formTitle">Add an app</h2>
+            <div class="set-card">
+              <div class="form" id="addForm">
+          <label>GitHub repository<input id="fRepo" placeholder="owner/name or https://github.com/owner/name"></label>
+          <label>Name<input id="fName" placeholder="Shown on the card"></label>
+          <label>Group<input id="fCat" placeholder="Choose a group or type a new one" list="catList" autocomplete="off"></label>
+          <datalist id="catList"></datalist>
+          <label>Description<input id="fDesc" placeholder="One short line"></label>
+          <label>Release file pattern <span class="hint">(optional)</span><input id="fPattern" placeholder="-web-.*\.zip$"></label>
+          <label>Icon address <span class="hint">(optional, https)</span><input id="fIcon" placeholder="Used if no icon is found automatically"></label>
+          <div class="row wide">
+            <button class="btn solid" id="saveAppBtn" type="button">Add app</button>
+            <button class="btn ghost" id="cancelEditBtn" type="button" hidden>Cancel edit</button>
+          </div>
+          <p class="err wide" id="formErr" role="alert"></p>
+        </div>
+            </div>
+          </section>
+
+          <section class="set-page" data-page="groups" hidden>
+            <p class="eyebrow">Admin</p>
+            <h2 class="set-title"><b>Groups</b> <span>and colours</span></h2>
+            <p class="note">Rename a group to move every app in it, or pick its colour.</p>
+            <div class="cats" id="catEditor"></div>
+          </section>
+
+          <section class="set-page" data-page="footer" hidden>
+            <p class="eyebrow">Admin</p>
+            <h2 class="set-title"><b>Home page</b> <span>footer</span></h2>
+            <p class="note">Off by default. When on, the contact is shown at the bottom of the home page for everyone.</p>
+            <div class="set-card">
+              <div class="form" id="siteForm">
+        <label class="wide check"><input type="checkbox" id="sContactOn"> Show contact details on the home page</label>
+        <label>Email or web address<input id="sContact" placeholder="you@example.com or https://example.com/contact"></label>
+        <label>Text before it <span class="hint">(optional)</span><input id="sLabel" placeholder="Questions or problems? Contact"></label>
+        <div class="row wide"><button class="btn solid" id="saveSiteBtn" type="button">Save footer</button></div>
+        <p class="err wide" id="siteErr" role="alert"></p>
+      </div>
+            </div>
+          </section>
+
+        </div>
+      </div>
     </section>
     <div class="tray" id="tray" aria-live="polite"></div>
     <div class="viewbar" id="viewbar" role="toolbar" aria-label="View controls" hidden>
@@ -123,12 +234,13 @@
       <h3>Using the apps</h3>
       <ul>
         <li>Pick a tool on the Home tab to open it in a new tab. Switch between tabs whenever you like; each open app keeps its place.</li>
+        <li><strong>Settings</strong> (the gear in the header, or at the bottom of the left column) opens as its own tab. Your preferences are there, and the site owner signs in under Admin to manage apps.</li>
         <li>Clicking an app on Home always opens it in a new tab, so you can have the same app open more than once (the tabs read WordCraft, WordCraft 2 and so on). The <strong>+</strong> in the app’s title bar opens another, and Shift-clicking an icon in the left column does too. Tabs of the same app share that app’s saved data in your browser, so save to files and be careful with apps that keep a library in the browser.</li>
         <li>While an app is open, the icons down the left side jump to any other app, and a green dot marks the ones already open. The list scrolls if there are many. Press the panel button at the top left to hide or show it; on small screens it opens over the app and closes when you pick one.</li>
         <li>On each tab, an open eye means that app is showing, and a crossed eye means it is hidden but still running (or not started yet, if the tab looks faded). The title bar above the app has a close button, and the logo takes you back Home without reloading.</li>
         <li>Open and save files from each app’s own menus. Files come from and go to your device, and nothing is uploaded to this server.</li>
         <li>Save to a file often. Browser storage is not a backup, and a crash or cleared browser data can lose unsaved work.</li>
-        <li>You are warned before closing the page or an app tab while apps are open. You can turn that off, and tab restoring too, under Preferences on the Home tab, which also says whether the warning is active.</li>
+        <li>You are warned before closing the page or an app tab while apps are open. You can turn that off, and tab restoring too, under Settings → Preferences, which also says whether the warning is active.</li>
         <li>When an app is being installed or updated, a small card at the bottom-left shows what is happening. You can hide it and carry on working; it comes back to tell you when the app is ready, or why it could not be installed.</li>
         <li>A banner offers a refresh when an app is added, updated or removed. Save your work first, because refreshing restarts the open apps.</li>
         <li>An <strong>Update</strong> tag on an app tile means a newer version exists that the site owner has not installed yet.</li>
@@ -146,7 +258,7 @@
         <li>These are full desktop-style apps, so on a small screen they are shown at a larger virtual size, scaled down so the whole window fits. Landscape and tablets give the most room.</li>
         <li>Use the controls at the bottom right: <strong>+</strong> and <strong>&minus;</strong> zoom in and out, the percentage button fits the app back to your screen, and the corner button hides the controls.</li>
         <li>When zoomed in, press <strong>Move view</strong> and drag to look around, then press <strong>Use app</strong> to go back to touching the app itself.</li>
-        <li>Prefer the app at its normal size? Turn off <strong>Fit apps to small screens</strong> under Preferences on the Home tab.</li>
+        <li>Prefer the app at its normal size? Turn off <strong>Fit apps to small screens</strong> under <strong>Settings → Preferences</strong>.</li>
       </ul>
 
       <h3>If an app will not open or looks blank</h3>
@@ -156,14 +268,14 @@
         <li>Make sure the address starts with <code>https://</code>. Many browser features, including saving to your device and fast graphics, only work on secure pages.</li>
         <li>Use an up-to-date Chrome, Edge, Firefox or Safari. These apps run as WebAssembly and need WebGL or WebGPU for graphics. Turn on hardware acceleration in your browser settings if it is off.</li>
         <li>Close other tabs and apps, especially on phones and tablets. Each open app uses memory.</li>
-        <li>If the bar says a file is missing, the problem is in how the project packaged that release. The site owner can choose another version in Manage, and the project’s maintainers can fix it in their next release.</li>
+        <li>If the bar says a file is missing, the problem is in how the project packaged that release. The site owner can choose another version in Settings, and the project’s maintainers can fix it in their next release.</li>
       </ol>
 
       <h3>What the hub fixes on its own</h3>
       <ul>
         <li>It finds the web build even when a project names its files differently, and skips installers for Windows, macOS and Linux.</li>
         <li>It checks every download before using it. If a file the app needs is in the wrong folder, it is moved into place.</li>
-        <li>If the newest release is broken, the hub keeps or installs the newest one that works, remembers the broken one so it is not downloaded again, and tells the owner why in Manage.</li>
+        <li>If the newest release is broken, the hub keeps or installs the newest one that works, remembers the broken one so it is not downloaded again, and tells the owner why in Settings.</li>
         <li>Sites built for the root of a domain have their main links adjusted so they load from here.</li>
         <li>Icons are taken from the app itself, or from the project’s repository, and a lettered tile is used if none is found.</li>
         <li>Routine log messages from apps are hidden so the browser console shows warnings and errors only.</li>
@@ -171,12 +283,12 @@
 
       <h3>Adding an app (site owner)</h3>
       <ol>
-        <li>Press <strong>Manage</strong> and sign in with the admin token.</li>
-        <li>Under <strong>Add an app</strong>, enter the project’s GitHub address, such as <code>owner/name</code>. Optionally choose a group, a short description, a release file pattern or an icon address.</li>
-        <li>Press <strong>Add app</strong>. The server finds the project’s releases, downloads the newest web build that works, and adds a tile. This usually takes under a minute. A card at the bottom-left shows progress, so you can close Manage and keep working, and it tells you when the app is ready or why it failed.</li>
+        <li>Open <strong>Settings</strong> (the gear in the header), choose <strong>Admin sign-in</strong> and enter the admin token.</li>
+        <li>Choose <strong>Add or edit an app</strong>, then enter the project’s GitHub address, such as <code>owner/name</code>. Optionally choose a group, a short description, a release file pattern or an icon address.</li>
+        <li>Press <strong>Add app</strong>. The server finds the project’s releases, downloads the newest web build that works, and adds a tile. This usually takes under a minute. A card at the bottom-left shows progress, so you can leave Settings and keep working, and it tells you when the app is ready or why it failed.</li>
         <li>After that the server checks for new releases by itself. Each app has an <strong>Update automatically</strong> switch. When it is off, the list shows that an update is available and you press <strong>Update</strong> when you are ready.</li>
         <li>To stay on a particular version, choose it in the version list and press <strong>Pin</strong>. A pinned app never changes until you unpin it, but the list still tells you when something newer exists.</li>
-        <li>Under <strong>Groups</strong> you can rename a group, which moves every app in it, and choose its colour. Use <strong>Edit</strong> on an app to change its details.</li>
+        <li>On the <strong>Groups</strong> page you can rename a group, which moves every app in it, and choose its colour. Use <strong>Edit</strong> on an app in <strong>Apps</strong> to change its details.</li>
       </ol>
 
       <h3>What an app needs in order to work here</h3>
@@ -198,69 +310,6 @@
       </ul>
     </div>
   </dialog>
-
-  <dialog id="manageDlg" aria-labelledby="manageTitle">
-    <div class="dlg-head">
-      <h2 id="manageTitle">Manage apps</h2>
-      <button class="btn ghost" id="manageClose" type="button">Close</button>
-    </div>
-    <div id="loginView" class="dlg-body">
-      <form id="loginForm" autocomplete="off" novalidate>
-        <p>Enter the admin token set in the container’s <code>ADMIN_TOKEN</code> variable.</p>
-        <input class="sr-only" type="text" name="username" autocomplete="username" value="admin" tabindex="-1" aria-hidden="true">
-        <div class="row">
-          <input id="tokenInput" type="password" autocomplete="off" aria-label="Admin token" placeholder="Admin token">
-          <button class="btn solid" id="loginBtn" type="submit">Sign in</button>
-        </div>
-        <p class="err" id="loginErr" role="alert"></p>
-      </form>
-    </div>
-    <div id="adminView" class="dlg-body" hidden>
-      <div class="row spread">
-        <p class="note" id="adminNote"></p>
-        <div class="row">
-          <button class="btn" id="checkAllBtn" type="button">Check for updates</button>
-          <button class="btn ghost" id="logoutBtn" type="button">Sign out</button>
-        </div>
-      </div>
-
-      <h3 id="appsHeading">Apps</h3>
-      <ul class="applist" id="adminList"></ul>
-
-      <h3>Groups</h3>
-      <p class="note">Rename a group to move every app in it, or pick its colour.</p>
-      <div class="cats" id="catEditor"></div>
-
-      <section id="appForm">
-        <h3 id="formTitle">Add an app</h3>
-        <div class="form" id="addForm">
-          <label>GitHub repository<input id="fRepo" placeholder="owner/name or https://github.com/owner/name"></label>
-          <label>Name<input id="fName" placeholder="Shown on the card"></label>
-          <label>Group<input id="fCat" placeholder="Choose a group or type a new one" list="catList" autocomplete="off"></label>
-          <datalist id="catList"></datalist>
-          <label>Description<input id="fDesc" placeholder="One short line"></label>
-          <label>Release file pattern <span class="hint">(optional)</span><input id="fPattern" placeholder="-web-.*\.zip$"></label>
-          <label>Icon address <span class="hint">(optional, https)</span><input id="fIcon" placeholder="Used if no icon is found automatically"></label>
-          <div class="row wide">
-            <button class="btn solid" id="saveAppBtn" type="button">Add app</button>
-            <button class="btn ghost" id="cancelEditBtn" type="button" hidden>Cancel edit</button>
-          </div>
-          <p class="err wide" id="formErr" role="alert"></p>
-        </div>
-      </section>
-
-      <h3>Home page footer</h3>
-      <p class="note">Off by default. When on, the contact is shown at the bottom of the home page for everyone.</p>
-      <div class="form" id="siteForm">
-        <label class="wide check"><input type="checkbox" id="sContactOn"> Show contact details on the home page</label>
-        <label>Email or web address<input id="sContact" placeholder="you@example.com or https://example.com/contact"></label>
-        <label>Text before it <span class="hint">(optional)</span><input id="sLabel" placeholder="Questions or problems? Contact"></label>
-        <div class="row wide"><button class="btn solid" id="saveSiteBtn" type="button">Save footer</button></div>
-        <p class="err wide" id="siteErr" role="alert"></p>
-      </div>
-    </div>
-  </dialog>
-
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="/_hub/app.js" defer></script>
 </body>

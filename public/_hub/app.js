@@ -44,7 +44,10 @@
   let openTabs = [];           // open tabs in order: { tid, app, num }. The same app can be open more than once.
   let tidSeq = 0;
   const lastTab = {};          // app id -> the tab of that app used most recently
-  let active = 'home';        // 'home' or a tab id
+  let active = 'home';        // 'home', 'settings' or a tab id
+  let settingsOpen = false;    // the Settings screen is open as a tab
+  let settingsPage = 'prefs';
+  let beforeSettings = 'home'; // where closing Settings goes back to
   const frames = new Map();    // id -> iframe (created lazily, kept alive while the tab is open)
   const wraps = new Map();     // id -> { vp, size, shield } scrollable viewport around each iframe
   const problems = new Map();  // id -> { text } for apps that failed to start
@@ -87,12 +90,14 @@
     $('#themeBtn').title = `Switch to ${next.toLowerCase()}`;
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', t === 'dark' ? '#17171b' : '#ffffff');
+    for (const b of document.querySelectorAll('[data-theme-opt]')) b.setAttribute('aria-pressed', String(b.dataset.themeOpt === t));
   }
   $('#themeBtn').addEventListener('click', () => {
     const t = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
     store.set('theme', t); applyTheme(t);
   });
   applyTheme(document.documentElement.dataset.theme);
+  for (const b of document.querySelectorAll('[data-theme-opt]')) b.addEventListener('click', () => { store.set('theme', b.dataset.themeOpt); applyTheme(b.dataset.themeOpt); });
 
   // The logo goes Home without reloading, so open apps keep their place.
   document.querySelector('.brand')?.addEventListener('click', (e) => { e.preventDefault(); drawerOpen = false; activate('home'); });
@@ -221,6 +226,15 @@
   const EYE_OFF = [...EYE, ['path', { d: 'M4 4l16 16' }]];
   const HOME = [['path', { d: 'M4 11l8-6.5 8 6.5v8.5a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z' }]];
   const CLOSE = [['path', { d: 'M6 6l12 12M18 6L6 18' }]];
+  const GEAR = [['path', { d: 'M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z' }], ['circle', { cx: 12, cy: 12, r: 3 }]];
+  const SLIDERS = [['path', { d: 'M4 7h9M17 7h3M4 17h3M11 17h9' }], ['circle', { cx: 15, cy: 7, r: 2.2 }], ['circle', { cx: 9, cy: 17, r: 2.2 }]];
+  const INFO = [['circle', { cx: 12, cy: 12, r: 9 }], ['path', { d: 'M12 11v5M12 8v.1' }]];
+  const LOCK = [['rect', { x: 5, y: 11, width: 14, height: 9, rx: 2 }], ['path', { d: 'M8 11V8a4 4 0 0 1 8 0v3' }]];
+  const GRID = [['rect', { x: 4, y: 4, width: 6.5, height: 6.5, rx: 1.5 }], ['rect', { x: 13.5, y: 4, width: 6.5, height: 6.5, rx: 1.5 }], ['rect', { x: 4, y: 13.5, width: 6.5, height: 6.5, rx: 1.5 }], ['rect', { x: 13.5, y: 13.5, width: 6.5, height: 6.5, rx: 1.5 }]];
+  const PLUS = [['path', { d: 'M12 5v14M5 12h14' }]];
+  const FOLDER = [['path', { d: 'M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z' }]];
+  const LAYOUT = [['rect', { x: 3.5, y: 4.5, width: 17, height: 15, rx: 2.5 }], ['path', { d: 'M3.5 15h17' }]];
+  const SIGNOUT = [['path', { d: 'M9 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3M15 8l4 4-4 4M19 12H9' }]];
 
   function appIcon(a, size, cls = 'ico') {
     const letter = h('span', { class: `${cls} letter`, 'aria-hidden': 'true', text: a.name.slice(0, 1).toUpperCase() });
@@ -266,6 +280,7 @@
       }
     }
     $('#railList').replaceChildren(...items);
+    $('#railSettings').classList.toggle('active', active === 'settings');
   }
 
   function applyRail() {
@@ -311,9 +326,22 @@
   function renderTabs() {
     const chips = [tabEl(null, null)];
     for (const t of openTabs) { const a = appById(t.app); if (a) chips.push(tabEl(t, a)); }
+    if (settingsOpen) chips.push(settingsTabEl());
     $('#tabs').replaceChildren(...chips);
     if ($('#groups').children.length) renderHome(); // refresh the "Open" badges
     renderRail();
+  }
+
+  function settingsTabEl() {
+    const isActive = active === 'settings';
+    const main = h('button', {
+      class: 'main', type: 'button', role: 'tab', id: 'tab-settings', 'aria-selected': String(isActive), 'aria-controls': 'settingsWin',
+      tabindex: isActive ? '0' : '-1', onclick: () => activate('settings'), onkeydown: tabKeys,
+    }, icon(GEAR, 16), h('span', { class: 'label', text: 'Settings' }));
+    const wrap = h('div', { class: 'tab' + (isActive ? ' active' : ''), role: 'presentation' }, main);
+    wrap.append(h('button', { class: 'x', type: 'button', 'aria-label': 'Close Settings', title: 'Close tab', onclick: (e) => { e.stopPropagation(); closeSettings(); } }, icon(CLOSE, 13)));
+    wrap.addEventListener('auxclick', (e) => { if (e.button === 1) { e.preventDefault(); closeSettings(); } });
+    return wrap;
   }
 
   function tabEl(t, a) {            // t === null is the Home tab
@@ -339,7 +367,7 @@
     return wrap;
   }
   function tabKeys(e) {
-    const order = ['home', ...openTabs.map((t) => t.tid)];
+    const order = ['home', ...openTabs.map((t) => t.tid), ...(settingsOpen ? ['settings'] : [])];
     const i = order.indexOf(active);
     let n = null;
     if (e.key === 'ArrowRight') n = order[(i + 1) % order.length];
@@ -479,7 +507,7 @@
 
   function updateViewbar(m, zoomed) {
     const bar = $('#viewbar');
-    bar.hidden = !(m.small && active !== 'home');
+    bar.hidden = !(m.small && activeTab());
     bar.classList.toggle('collapsed', view.collapsed);
     $('#vbLabel').textContent = `${Math.round(m.s * 100)}%`;
     $('#vbOut').disabled = m.s <= m.fit + 0.01;
@@ -523,15 +551,20 @@
   window.addEventListener('orientationchange', () => setTimeout(layoutAll, 250));
 
   function activate(id) {
-    if (id !== 'home') { const t0 = tabById(id); if (!t0 || !appById(t0.app)) id = 'home'; }
+    if (id === 'settings') settingsOpen = true;
+    else if (id !== 'home') { const t0 = tabById(id); if (!t0 || !appById(t0.app)) id = 'home'; }
     active = id;
     $('#home').hidden = id !== 'home';
+    $('#settingsWin').hidden = id !== 'settings';
     for (const [fid, w] of wraps) {
       const on = fid === id;
       w.vp.classList.toggle('active', on);
       w.vp.inert = !on;
     }
-    if (id !== 'home') {
+    if (id === 'settings') {
+      document.title = 'Settings · ArtCraft Hub';
+      showSettingsPage(settingsPage);
+    } else if (id !== 'home') {
       const t = tabById(id);
       const a = appById(t.app);
       lastTab[t.app] = id;
@@ -545,6 +578,7 @@
       document.title = 'ArtCraft Hub';
       loadApps();
     }
+    if (id !== 'settings') stopAdminPoll();
     renderTabs(); renderProblem(); renderAppBar(); saveSession(); applyRail(); layoutAll(); renderProtection();
   }
 
@@ -584,7 +618,7 @@
 
   $('#fitPref').addEventListener('change', (e) => { prefs.fit = e.target.checked; store.set('fit', prefs.fit); layoutAll(); });
 
-  function saveSession() { if (prefs.restore) store.set('session', { tabs: openTabs.map((t) => ({ tid: t.tid, app: t.app, num: t.num })), active, seq: tidSeq }); }
+  function saveSession() { if (prefs.restore) store.set('session', { tabs: openTabs.map((t) => ({ tid: t.tid, app: t.app, num: t.num })), active, seq: tidSeq, settings: settingsOpen }); }
 
   window.addEventListener('beforeunload', (e) => {
     if (!prefs.warn || !frames.size) return undefined;
@@ -650,7 +684,6 @@
   let pollTimer = null;
   let editingId = null;
   let lastAdminList = [];
-  const dlg = $('#manageDlg');
 
   async function api(path, opts = {}) {
     const res = await fetch(path, { ...opts, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
@@ -660,11 +693,86 @@
     return data;
   }
 
-  function showAdmin(on) { $('#loginView').hidden = on; $('#adminView').hidden = !on; dlg.classList.toggle('signin', !on); }
+  // ---------- Settings screen: preferences for everyone, admin tools behind a sign-in ----------
+  const ADMIN_PAGES = ['apps', 'addapp', 'groups', 'footer'];
+  const SET_PAGES = [
+    { id: 'prefs', group: 'General', label: 'Preferences', icon: SLIDERS },
+    { id: 'about', group: 'General', label: 'Help and about', icon: INFO },
+    { id: 'signin', group: 'Admin', label: 'Admin sign-in', icon: LOCK, when: 'out' },
+    { id: 'apps', group: 'Admin', label: 'Apps', icon: GRID, when: 'in' },
+    { id: 'addapp', group: 'Admin', label: 'Add or edit an app', icon: PLUS, when: 'in' },
+    { id: 'groups', group: 'Admin', label: 'Groups', icon: FOLDER, when: 'in' },
+    { id: 'footer', group: 'Admin', label: 'Home page footer', icon: LAYOUT, when: 'in' },
+  ];
+  let adminShown = false;
 
-  $('#manageBtn').addEventListener('click', () => { dlg.showModal(); if (token) refreshAdmin().catch(() => showAdmin(false)); else { showAdmin(false); $('#tokenInput').focus(); } });
-  $('#manageClose').addEventListener('click', () => dlg.close());
-  dlg.addEventListener('close', () => { clearInterval(pollTimer); pollTimer = null; loadApps(); });
+  const stopAdminPoll = () => { clearInterval(pollTimer); pollTimer = null; };
+
+  function renderSettingsNav() {
+    const items = [];
+    let group = null;
+    for (const p of SET_PAGES) {
+      if ((p.when === 'in' && !token) || (p.when === 'out' && token)) continue;
+      if (p.group !== group) { group = p.group; items.push(h('p', { class: 'set-group', text: group })); }
+      items.push(h('button', {
+        class: 'set-item' + (settingsPage === p.id ? ' active' : ''), type: 'button', 'aria-current': settingsPage === p.id ? 'page' : null,
+        onclick: () => showSettingsPage(p.id),
+      }, icon(p.icon, 18), h('span', { text: p.label })));
+    }
+    if (token) items.push(h('button', { class: 'set-item signout', type: 'button', onclick: () => signOut() }, icon(SIGNOUT, 18), h('span', { text: 'Sign out' })));
+    $('#setNav').replaceChildren(...items);
+  }
+
+  function displayPage(id) {
+    for (const pg of document.querySelectorAll('.set-page')) pg.hidden = pg.dataset.page !== id;
+    renderSettingsNav();
+    $('#setMain').scrollTop = 0;
+  }
+
+  function showSettingsPage(id) {
+    if (ADMIN_PAGES.includes(id) && !token) id = 'signin';
+    if (id === 'signin' && token) id = 'apps';
+    settingsPage = id;
+    displayPage(id);
+    if (ADMIN_PAGES.includes(id)) refreshAdmin().catch((e) => { if (e.status === 401) signOut('Your sign-in is no longer valid. Please sign in again.'); });
+    else stopAdminPoll();
+    if (id === 'prefs') renderProtection();
+    if (id === 'signin') setTimeout(() => { if (active === 'settings') $('#tokenInput').focus(); }, 0);
+  }
+
+  function openSettings(page) {
+    if (page) settingsPage = page;
+    if (active !== 'settings') beforeSettings = active;
+    activate('settings');
+  }
+  function closeSettings() {
+    settingsOpen = false;
+    stopAdminPoll();
+    if (active === 'settings') {
+      const back = beforeSettings === 'home' || tabById(beforeSettings) ? beforeSettings : 'home';
+      activate(back);
+    } else { renderTabs(); saveSession(); }
+  }
+
+  // Keeps the sidebar and the visible page in step with whether an admin is signed in.
+  function showAdmin(on) {
+    if (on === adminShown) return;
+    adminShown = on;
+    if (on && settingsPage === 'signin') settingsPage = 'apps';
+    if (!on && ADMIN_PAGES.includes(settingsPage)) settingsPage = 'signin';
+    if (settingsOpen) displayPage(settingsPage);
+  }
+  function signOut(message) {
+    token = ''; stopAdminPoll();
+    $('#loginErr').textContent = message || '';
+    showAdmin(false);
+    renderSettingsNav();
+  }
+
+  $('#manageBtn').addEventListener('click', () => openSettings());
+  $('#railSettings').addEventListener('click', () => { drawerOpen = false; openSettings(); });
+  $('#settingsClose').addEventListener('click', closeSettings);
+  $('#openHelpBtn').addEventListener('click', () => $('#helpDlg').showModal());
   $('#loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     token = $('#tokenInput').value; $('#tokenInput').value = ''; $('#loginErr').textContent = '';
@@ -672,7 +780,6 @@
     try { await refreshAdmin(); }
     catch (err) { token = ''; $('#loginErr').textContent = err.message; showAdmin(false); }
   });
-  $('#logoutBtn').addEventListener('click', () => { token = ''; showAdmin(false); clearInterval(pollTimer); pollTimer = null; });
 
   async function refreshAdmin() {
     const data = await api('/api/admin/apps');
@@ -683,7 +790,7 @@
       ? `Checks GitHub for new releases every ${data.intervalHours} hours, for apps with automatic updates on.`
       : 'Automatic update checks are turned off for this server.';
     renderAdminList(data.apps);
-    renderCategoryEditor(data.apps);
+    if (!(document.activeElement && document.activeElement.closest && document.activeElement.closest('#catEditor'))) renderCategoryEditor(data.apps);
     fillSiteForm(data.settings || {});
     // suggestions are only the groups that exist now, so renamed or emptied groups disappear
     $('#catList').replaceChildren(...catOrder(new Set(data.apps.map((a) => a.category).filter(Boolean))).map((c) => h('option', { value: c })));
@@ -801,17 +908,16 @@
     } catch (e) { toast(e.message); }
   }
 
-  // Edit takes you straight to the form, filled in.
+  // Edit opens the Add or edit page with the form filled in.
   function editApp(a) {
     editingId = a.id;
     $('#fRepo').value = a.repo; $('#fName').value = a.name; $('#fCat').value = a.category || '';
     $('#fDesc').value = a.description || ''; $('#fPattern').value = a.assetPattern || ''; $('#fIcon').value = a.iconUrl || '';
     $('#formTitle').textContent = `Edit ${a.name}`; $('#saveAppBtn').textContent = 'Save changes';
     $('#cancelEditBtn').hidden = false; $('#formErr').textContent = '';
-    const section = $('#appForm');
-    section.scrollIntoView(smooth());
-    section.classList.add('flash'); setTimeout(() => section.classList.remove('flash'), 1600);
-    $('#fRepo').focus({ preventScroll: true });
+    settingsPage = 'addapp';
+    displayPage('addapp');
+    $('#fRepo').focus();
   }
   function resetForm() {
     editingId = null;
@@ -819,7 +925,7 @@
     $('#formTitle').textContent = 'Add an app'; $('#saveAppBtn').textContent = 'Add app';
     $('#cancelEditBtn').hidden = true; $('#formErr').textContent = '';
   }
-  $('#cancelEditBtn').addEventListener('click', resetForm);
+  $('#cancelEditBtn').addEventListener('click', () => { resetForm(); showSettingsPage('apps'); });
   $('#saveAppBtn').addEventListener('click', async () => {
     $('#formErr').textContent = '';
     const body = {
@@ -831,8 +937,7 @@
       const before = editingId ? lastAdminList.find((x) => x.id === editingId) : null;
       toast(editingId ? 'Saved.' : 'Added.');
       if (res.app && res.app.installing) trackJob(res.app.id, res.app.name || body.name, editingId ? 'update' : 'install', before ? before.version : null);
-      resetForm(); await refreshAdmin();
-      $('#appsHeading').scrollIntoView(smooth());
+      resetForm(); showSettingsPage('apps');
     } catch (e) { $('#formErr').textContent = e.message; }
   });
   $('#checkAllBtn').addEventListener('click', async () => {
@@ -871,7 +976,7 @@
     const actions = [];
     if (j.phase === 'done' && j.kind === 'install') actions.push(h('button', { class: 'btn solid', type: 'button', onclick: () => { hideJob(id); if (appById(id)) openNew(id); } }, 'Open'));
     if (j.phase === 'done' && j.kind !== 'install' && openTabs.some((t) => t.app === id)) actions.push(h('button', { class: 'btn solid', type: 'button', onclick: () => location.reload() }, 'Refresh'));
-    if (j.phase === 'failed' && token) actions.push(h('button', { class: 'btn', type: 'button', onclick: () => { hideJob(id); dlg.showModal(); refreshAdmin().catch(() => showAdmin(false)); } }, 'Open Manage'));
+    if (j.phase === 'failed' && token) actions.push(h('button', { class: 'btn', type: 'button', onclick: () => { hideJob(id); openSettings('apps'); } }, 'Open Settings'));
     j.tEl = h('strong', { text: jobTitle(j) });
     j.dEl = h('small', { text: j.detail || '' });
     return h('div', {
@@ -973,9 +1078,11 @@
       openTabs = s.tabs.map((x) => (typeof x === 'string' ? { app: x } : x)).filter((x) => x && appById(x.app))
         .map((x) => ({ tid: typeof x.tid === 'string' && /^t\d+$/.test(x.tid) ? x.tid : `t${++tidSeq}`, app: x.app, num: Number(x.num) || 1 }));
       for (const t of openTabs) tidSeq = Math.max(tidSeq, Number(t.tid.slice(1)) || 0);
-      if (openTabs.length) {
+      settingsOpen = Boolean(s.settings);
+      if (openTabs.length || settingsOpen) {
         let want = s.active;
-        if (typeof want === 'string' && !tabById(want)) want = openTabs.find((t) => t.app === want)?.tid || 'home';
+        if (want === 'settings') { if (!settingsOpen) want = 'home'; }
+        else if (typeof want === 'string' && !tabById(want)) want = openTabs.find((t) => t.app === want)?.tid || 'home';
         activate(want);
         toast(protectionState() === 'waiting' ? 'Reopened your tabs. Click anywhere to switch on the close warning, and open your files again if an app starts empty.' : 'Reopened your tabs. Open your files again if an app starts empty.');
         return;
