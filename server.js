@@ -40,6 +40,8 @@ const TMP_DIR = path.join(DATA_DIR, 'tmp');
 const CATS_FILE = path.join(DATA_DIR, 'categories.json');    // group colours chosen in Manage
 const SEEN_FILE = path.join(DATA_DIR, 'defaults-seen.json'); // default apps this install has already been offered
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');  // home page footer contact
+const STORE_FILE = path.join(DATA_DIR, 'store.json');        // the app store catalog, refreshed from the official launcher
+const STORE_ICONS = path.join(DATA_DIR, 'store-icons');
 const LEGACY_DEFAULT_IDS = ['wordcraft', 'gridcraft', 'deckcraft', 'pdfcraft', 'designcraft']; // shipped before defaults sync
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
@@ -85,6 +87,9 @@ async function init() {
   state = await readJson(STATE_FILE, {});
   categories = Object.assign(Object.create(null), await readJson(CATS_FILE, {}));
   settings = { ...settings, ...(await readJson(SETTINGS_FILE, {})) };
+  await fsp.mkdir(STORE_ICONS, { recursive: true });
+  const savedStore = await readJson(STORE_FILE, null);
+  store = savedStore && Array.isArray(savedStore.entries) && savedStore.entries.length ? savedStore : { fetchedAt: null, source: 'built-in list', entries: await fallbackEntries() };
 
   // New apps added to default-apps.json reach existing installs too. An app the owner
   // removed stays removed, because its id is remembered as already offered.
@@ -609,6 +614,8 @@ async function syncApp(app, opts = {}) {
 
 async function checkAll() {
   for (const app of [...apps]) await syncApp(app);
+  const stale = !store.fetchedAt || Date.now() - Date.parse(store.fetchedAt) > STORE_REFRESH_HOURS * 3_600_000;
+  if (stale) await refreshStore().catch((err) => log(`store refresh failed: ${err.message}`));
 }
 
 // ---------- launch diagnostics ----------
@@ -625,6 +632,132 @@ function noteMissing(id, rel) {
   if (hit) hit.at = Date.now(); else list.push({ path: rel, at: Date.now() });
   missingLog.set(id, list.slice(-10));
 }
+
+// ---------- app store: the official launcher's list of known projects ----------
+// The catalog is read from the table in the official craft-launcher README, so it follows that list.
+// Each project is then checked for a web build the same way installs are, so the store only offers
+// projects that can really run here. A built-in copy of the list is used until the first refresh.
+const STORE_URL = process.env.STORE_URL ?? `${GITHUB_RAW}/storytold/craft-launcher/main/README.md`;
+const STORE_REFRESH_HOURS = Number(process.env.STORE_REFRESH_HOURS ?? 24);
+let store = { fetchedAt: null, source: 'built-in list', entries: [] };
+let storeBusy = false;
+const saveStore = () => writeJson(STORE_FILE, store);
+const slugId = (repo) => repo.split('/')[1].toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+const isInstalledRepo = (repo) => apps.some((a) => a.repo.toLowerCase() === repo.toLowerCase());
+const storeIconFile = (id) => ICON_EXT.map((x) => `${id}.${x}`).find((f) => fs.existsSync(path.join(STORE_ICONS, f))) || null;
+
+function normaliseEntry(e) {
+  const repo = normaliseRepo(e.repo);
+  const name = cleanText(e.name, 60);
+  if (!repo || !name) return null;
+  const url = (v, max) => (/^https?:\/\//i.test(String(v || '')) ? String(v).slice(0, max) : '');
+  return { id: slugId(repo), name, repo, description: cleanText(e.description, 200), website: url(e.website, 300), icon: url(e.icon, 400), community: Boolean(e.community) };
+}
+async function fallbackEntries() {
+  const raw = JSON.parse(await fsp.readFile(path.join(__dirname, 'store-fallback.json'), 'utf8'));
+  return raw.map(normaliseEntry).filter(Boolean);
+}
+
+// Rows look like: | <img src="icon"> | **Name** | description | [GitHub](https://github.com/owner/repo) | [Website](...) |
+function parseCatalog(md) {
+  // only the suite's own section: stop at the next heading of the same or higher level
+  const head = md.match(/^(#{1,3})\s*The Craft App Suite.*$/mi);
+  let section = md;
+  if (head) {
+    const after = md.slice(head.index + head[0].length);
+    const next = after.search(new RegExp(`^#{1,${head[1].length}}\\s`, 'm'));
+    section = next >= 0 ? after.slice(0, next) : after;
+  }
+  const out = [];
+  for (const line of section.split('\n')) {
+    const l = line.trim();
+    if (!l.startsWith('|')) continue;
+    const cells = l.replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+    const nameCell = cells.find((c) => /^\*\*[^*]+\*\*$/.test(c));
+    const gh = l.match(/\]\(https:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+?)(?:\.git)?\/?\)/);
+    if (cells.length < 4 || !nameCell || !gh) continue;
+    const i = cells.indexOf(nameCell);
+    const description = (cells[i + 1] || '').replace(/<[^>]+>/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_`]/g, '').trim();
+    const icon = (cells[0].match(/src="([^"]+)"/) || cells[0].match(/\((https?:[^)]+)\)/) || [])[1] || '';
+    const site = cells.slice(i + 2).find((c) => !/github\.com\/[^/]+\/[^/)]+\)/.test(c) && /\]\((https?:[^)]+)\)/.test(c));
+    const website = site ? site.match(/\]\((https?:[^)]+)\)/)[1] : '';
+    const entry = normaliseEntry({ name: nameCell.replace(/\*\*/g, ''), repo: gh[1], description, website, icon, community: !/^storytold\//i.test(gh[1]) || /community app/i.test(description) });
+    if (entry && !out.some((x) => x.id === entry.id)) out.push(entry);
+  }
+  return out;
+}
+
+// A starting group for a project added from the store. The owner can rename or move it afterwards.
+function guessCategory(name, desc) {
+  const s = `${name} ${desc}`.toLowerCase();
+  if (/(word|document|spreadsheet|grid|deck|slide|presentation|mail|calendar)/.test(s)) return 'Office';
+  if (/pdf/.test(s)) return 'Productivity';
+  if (/(cad|3d model|parametric|solid)/.test(s)) return 'CAD/CAM';
+  if (/(video|film|sound|audio|motion|animation|effect)/.test(s)) return 'Media';
+  if (/(photo|image|vector|design|layout|interface|texture|material|illustration)/.test(s)) return 'Creative';
+  return 'Other';
+}
+
+// Does the project's newest releases include a web build this hub recognises?
+async function checkWeb(e) {
+  const now = new Date().toISOString();
+  try {
+    const rels = await listReleases(e.repo);
+    for (const r of rels.slice(0, 3)) if (pickAsset(r.assets, null)) return { status: 'yes', tag: r.tag, checkedAt: now };
+    return { status: 'no', tag: rels[0].tag, checkedAt: now };
+  } catch (err) {
+    if (err.status === 404 || /no published releases/.test(err.message)) return { status: 'no', tag: null, checkedAt: now };
+    return { ...(e.web || { status: 'unknown' }), note: err.message }; // rate limit or network: keep what we knew
+  }
+}
+
+const iconHostOk = (u) => { try { const h = new URL(u).host; return h === 'raw.githubusercontent.com' || h === new URL(GITHUB_RAW).host; } catch { return false; } };
+async function ensureStoreIcon(e) {
+  if (storeIconFile(e.id) || !e.icon || !iconHostOk(e.icon)) return;
+  const img = await fetchImage(e.icon);
+  if (img) await fsp.writeFile(path.join(STORE_ICONS, `${e.id}.${img.ext}`), img.buf);
+}
+
+async function refreshStore({ force = false } = {}) {
+  if (storeBusy) return;
+  storeBusy = true;
+  try {
+    let fresh = null;
+    if (STORE_URL) {
+      try {
+        const res = await fetch(STORE_URL, { headers: { 'User-Agent': 'artcraft-hub' }, signal: AbortSignal.timeout(20_000) });
+        if (res.ok) { const parsed = parseCatalog(await res.text()); if (parsed.length >= 3) fresh = parsed; }
+      } catch (err) { log(`store: could not read the catalog (${err.message}); keeping the list we have`); }
+    }
+    const before = new Map(store.entries.map((e) => [e.id, e]));
+    const hadList = Boolean(store.fetchedAt) && store.entries.length > 0;
+    const base = fresh || store.entries;
+    const now = Date.now();
+    store.entries = base.map((n) => { const o = before.get(n.id); return { ...n, web: o?.web || { status: 'unknown' }, firstSeen: o?.firstSeen ?? (hadList && fresh ? now : 0) }; });
+    if (fresh) { store.fetchedAt = new Date().toISOString(); store.source = STORE_URL; log(`store: ${fresh.length} projects from the official launcher`); }
+    await saveStore();
+    for (const e of store.entries) await ensureStoreIcon(e).catch(() => {});
+    for (const e of store.entries) {
+      if (isInstalledRepo(e.repo)) continue;
+      const stale = !e.web?.checkedAt || e.web.status === 'unknown' || Date.now() - Date.parse(e.web.checkedAt) > 24 * 3_600_000;
+      if (!force && !stale) continue;
+      e.web = await checkWeb(e); await saveStore(); await sleep(250);
+    }
+  } finally { storeBusy = false; }
+}
+
+const storeView = () => ({
+  fetchedAt: store.fetchedAt, source: store.source, refreshing: storeBusy,
+  entries: store.entries.map((e) => {
+    const inst = apps.find((a) => a.repo.toLowerCase() === e.repo.toLowerCase());
+    return {
+      id: e.id, name: e.name, repo: e.repo, description: e.description, website: e.website || null, community: Boolean(e.community),
+      category: guessCategory(e.name, e.description), icon: Boolean(storeIconFile(e.id)), web: e.web || { status: 'unknown' },
+      installed: Boolean(inst), installedId: inst ? inst.id : null,
+      isNew: Boolean(e.firstSeen && !inst && Date.now() - e.firstSeen < 14 * 86_400_000),
+    };
+  }),
+});
 
 // ---------- HTTP helpers ----------
 const MIME = {
@@ -662,10 +795,12 @@ function sendText(res, code, text) {
 // files inside the site are made relative (so sites built for a domain root still load),
 // and routine console chatter from the app is hidden.
 const QUIET_TAG = '<script src="/_hub/quiet.js"></script>';
+const BRIDGE_TAG = '<script src="/_hub/bridge.js"></script>'; // reports the open document's name to the hub
 function prepareAppHtml(html, root) {
   html = html.replace(/(\s(?:src|href)\s*=\s*)(["'])\/(?!\/)([^"'#?]+)([^"']*)\2/gi, (m, pre, q, p, rest) =>
     (!p.includes('..') && fs.existsSync(path.join(root, p)) ? `${pre}${q}./${p}${rest}${q}` : m));
-  if (QUIET_APPS) html = /<head(?:\s[^>]*)?>/i.test(html) ? html.replace(/<head(?:\s[^>]*)?>/i, (m) => m + QUIET_TAG) : QUIET_TAG + html;
+  const tags = BRIDGE_TAG + (QUIET_APPS ? QUIET_TAG : '');
+  html = /<head(?:\s[^>]*)?>/i.test(html) ? html.replace(/<head(?:\s[^>]*)?>/i, (m) => m + tags) : tags + html;
   return html;
 }
 
@@ -878,6 +1013,20 @@ async function handleAdmin(req, res, url) {
       return sendJson(res, 200, { settings: { ...settings } });
     }
 
+    if (what === 'store' && !id && req.method === 'GET') return sendJson(res, 200, storeView());
+    if (what === 'store' && id === 'refresh' && req.method === 'POST') {
+      const b = await readBody(req);
+      refreshStore({ force: Boolean(b.force) }).catch((err) => log(`store refresh failed: ${err.message}`));
+      return sendJson(res, 202, { ok: true });
+    }
+    if (what === 'store' && id === 'check' && req.method === 'POST') {
+      const b = await readBody(req);
+      const e = store.entries.find((x) => x.id === String(b.id || ''));
+      if (!e) return sendJson(res, 404, { error: 'Unknown project.' });
+      e.web = await checkWeb(e); await saveStore();
+      return sendJson(res, 200, { web: e.web });
+    }
+
     if (what === 'check' && req.method === 'POST') { checkAll(); return sendJson(res, 202, { ok: true }); }
     return sendJson(res, 404, { error: 'Not found.' });
   } catch (err) {
@@ -913,6 +1062,13 @@ const server = http.createServer(async (req, res) => {
       if (!m[2]) { res.writeHead(301, { Location: `${p}/${url.search}` }); return res.end(); }
       if (await serveFrom(req, res, path.join(APPS_DIR, m[1], 'current'), m[2], 'app')) return;
       noteMissing(m[1], m[2].replace(/^\//, ''));
+      return sendText(res, 404, 'Not found');
+    }
+
+    const sicon = p.match(/^\/store-icons\/([a-z0-9-]+)$/);
+    if (sicon) {
+      const f = storeIconFile(sicon[1]);
+      if (f && await serveFrom(req, res, STORE_ICONS, `/${f}`, 'icon')) return;
       return sendText(res, 404, 'Not found');
     }
 

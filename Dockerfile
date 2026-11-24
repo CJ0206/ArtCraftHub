@@ -8,7 +8,7 @@ ENV NODE_ENV=production \
     PORT=8080
 
 WORKDIR /srv
-COPY server.js default-apps.json ./
+COPY server.js default-apps.json store-fallback.json ./
 COPY public ./public
 COPY entrypoint.sh /entrypoint.sh
 
