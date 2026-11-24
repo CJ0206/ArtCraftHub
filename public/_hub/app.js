@@ -44,6 +44,8 @@
   let openTabs = [];           // open tabs in order: { tid, app, num }. The same app can be open more than once.
   let tidSeq = 0;
   const lastTab = {};          // app id -> the tab of that app used most recently
+  const tabHistory = [];       // app tabs, most recently used first (Minimise goes back to the next one)
+  let maxTid = null;           // the tab that is showing full screen, if any
   let active = 'home';        // 'home', 'settings' or a tab id
   let settingsOpen = false;    // the Settings screen is open as a tab
   let settingsPage = 'prefs';
@@ -55,7 +57,9 @@
   const tabById = (tid) => openTabs.find((t) => t.tid === tid) || null;
   const activeTab = () => tabById(active);
   const activeApp = () => { const t = activeTab(); return t ? appById(t.app) : null; };
-  const tabLabel = (t, a) => (a ? a.name : 'App') + (t.num > 1 ? ` ${t.num}` : '');
+  const docTitle = (t, a) => (t.title && (!a || t.title.toLowerCase() !== a.name.toLowerCase()) ? t.title : '');
+  // A tab is named after its open document when the app reports one, like a desktop window; otherwise the app name.
+  const tabLabel = (t, a) => docTitle(t, a) || (a ? a.name : 'App') + (t.num > 1 ? ` ${t.num}` : '');
 
   // ---------- group colours ----------
   const DEFAULT_CAT = { Office: 'var(--lav)', Create: 'var(--rose)', Other: 'var(--sage)' };
@@ -107,7 +111,7 @@
     const closer = e.target.closest && e.target.closest('[data-close]');
     if (closer) closer.closest('dialog')?.close();
   });
-  $('#helpBtn').addEventListener('click', () => $('#helpDlg').showModal());
+  $('#helpBtn').addEventListener('click', () => openSettings('help-using'));
 
   // ---------- loading the app list, and noticing changes ----------
   let lastSig = '';
@@ -201,12 +205,15 @@
   function renderContact() {
     const el = $('#contact');
     const c = site && site.contact;
+    const sc = $('#supportContact');
+    if (sc) sc.textContent = c && c.value ? '' : 'The site owner has not added contact details. Ask the person who runs this hub.';
     if (!c || !c.value) { el.hidden = true; return; }
     const shown = c.kind === 'url' ? c.value.replace(/^https?:\/\//, '').replace(/\/$/, '') : c.value;
     const link = c.kind === 'email'
       ? h('a', { href: `mailto:${c.value}` }, shown)
       : c.kind === 'url' ? h('a', { href: c.value, target: '_blank', rel: 'noopener noreferrer' }, shown) : shown;
     el.replaceChildren(`${c.label || 'Questions or problems? Contact'} `, link);
+    if (sc) sc.replaceChildren(`${c.label || 'Questions or problems? Contact'} `, c.kind === 'email' ? h('a', { href: `mailto:${c.value}` }, shown) : c.kind === 'url' ? h('a', { href: c.value, target: '_blank', rel: 'noopener noreferrer' }, shown) : shown);
     el.hidden = false;
   }
 
@@ -234,6 +241,11 @@
   const PLUS = [['path', { d: 'M12 5v14M5 12h14' }]];
   const FOLDER = [['path', { d: 'M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z' }]];
   const LAYOUT = [['rect', { x: 3.5, y: 4.5, width: 17, height: 15, rx: 2.5 }], ['path', { d: 'M3.5 15h17' }]];
+  const MAXI = [['rect', { x: 5, y: 5, width: 14, height: 14, rx: 2 }]];
+  const RESTORE = [['rect', { x: 5, y: 9, width: 10, height: 10, rx: 1.8 }], ['path', { d: 'M9 9V6.8A1.8 1.8 0 0 1 10.8 5h6.4A1.8 1.8 0 0 1 19 6.8v6.4a1.8 1.8 0 0 1-1.8 1.8H15' }]];
+  const TOOL = [['path', { d: 'M14.7 6.3a4 4 0 0 0-5.4 5.2L4 16.8V20h3.2l5.3-5.3a4 4 0 0 0 5.2-5.4l-2.6 2.6-2.4-.6-.6-2.4z' }]];
+  const CHAT = [['path', { d: 'M5 6h14a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-8l-4 3.5V16H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1z' }]];
+  const STORE = [['path', { d: 'M5 8h14l-1 11a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1z' }], ['path', { d: 'M9 8V7a3 3 0 0 1 6 0v1' }]];
   const SIGNOUT = [['path', { d: 'M9 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3M15 8l4 4-4 4M19 12H9' }]];
 
   function appIcon(a, size, cls = 'ico') {
@@ -310,10 +322,12 @@
     win.classList.toggle('off', !a);
     if (!a) return;
     const label = tabLabel(t, a);
+    const doc = docTitle(t, a);
     $('#appbarInfo').replaceChildren(
       appIcon(a, 20, 'bico'),
-      h('span', { class: 'nm', text: label }),
-      a.version ? h('span', { class: 'ver', text: a.version }) : null);
+      h('span', { class: 'nm', text: a.name + (!doc && t.num > 1 ? ` ${t.num}` : '') }),
+      a.version ? h('span', { class: 'ver', text: a.version }) : null,
+      doc ? h('span', { class: 'doc', text: doc }) : null);
     $('#appbarClose').setAttribute('aria-label', `Close ${label}`);
     $('#appbarClose').title = `Close ${label}`;
     $('#appbarNew').setAttribute('aria-label', `Open another ${a.name} in a new tab`);
@@ -356,6 +370,7 @@
     const main = h('button', {
       class: 'main', type: 'button', role: 'tab', id: `tab-${tid}`, 'aria-selected': String(isActive),
       'aria-controls': isHome ? 'home' : `frame-${tid}`, tabindex: isActive ? '0' : '-1',
+      title: isHome ? null : (docTitle(t, a) ? `${a.name}: ${docTitle(t, a)}` : null),
       onclick: () => activate(tid), onkeydown: tabKeys,
     }, isHome ? icon(HOME, 16) : appIcon(a, 18, 'tico'), h('span', { class: 'label', text: label }), status);
     const wrap = h('div', { class: 'tab' + (isActive ? ' active' : '') + (!isHome && !loaded ? ' unloaded' : ''), role: 'presentation' }, main);
@@ -408,6 +423,7 @@
   $('#problemReload').addEventListener('click', () => {
     const f = frames.get(active);
     problems.delete(active); renderProblem();
+    const tt = activeTab(); if (tt) { tt.title = ''; renderTabs(); renderAppBar(); }
     if (f) { try { f.contentWindow.location.reload(); } catch { f.src = f.src; } }
   });
 
@@ -450,7 +466,12 @@
       class: 'frame', id: `frame-${t.tid}`, title: tabLabel(t, a),
       allow: 'clipboard-read; clipboard-write; fullscreen; autoplay; encrypted-media', 'data-id': t.app,
     });
-    f.addEventListener('load', () => { if (f.getAttribute('src')) onFrameLoad(t.tid, t.app, f); });
+    f.addEventListener('load', () => {
+      if (!f.getAttribute('src')) return;
+      const t0 = tabById(t.tid);
+      if (t0 && t0.stale) { t0.stale = false; t0.title = ''; renderTabs(); renderAppBar(); } // a restored tab starts a fresh document
+      onFrameLoad(t.tid, t.app, f);
+    });
     const shield = h('div', { class: 'pan-shield', hidden: true });
     const size = h('div', { class: 'vp-size' }, f, shield);
     const vp = h('div', { class: 'vp' }, size);
@@ -464,8 +485,54 @@
   function dropFrame(id) {
     wraps.get(id)?.vp.remove(); wraps.delete(id);
     frames.delete(id); problems.delete(id);
+    const hi = tabHistory.indexOf(id); if (hi >= 0) tabHistory.splice(hi, 1);
+    if (maxTid === id) { maxTid = null; document.body.classList.remove('is-max'); }
     renderProtection();
   }
+
+  // ---------- document names, reported by the app (see bridge.js) ----------
+  window.addEventListener('message', (e) => {
+    if (e.origin !== location.origin) return;
+    const d = e.data;
+    if (!d || d.source !== 'artcraft-hub' || d.type !== 'title' || typeof d.title !== 'string') return;
+    for (const [tid, f] of frames) if (f.contentWindow === e.source) { setDocTitle(tid, d.title); break; }
+  });
+  function setDocTitle(tid, title) {
+    const t = tabById(tid);
+    title = String(title).replace(/\s+/g, ' ').trim().slice(0, 200);
+    if (!t || t.title === title) return;
+    t.title = title; t.stale = false;
+    renderTabs(); renderAppBar(); saveSession();
+    if (active === tid) document.title = `${tabLabel(t, appById(t.app))} · ArtCraft Hub`;
+  }
+
+  // ---------- window controls: minimise and full screen ----------
+  function updateMaxButtons() {
+    const on = Boolean(maxTid);
+    const label = on ? 'Exit full screen' : 'Full screen';
+    for (const el of [$('#appbarMax'), $('#vbFull')]) {
+      el.replaceChildren(icon(on ? RESTORE : MAXI, el.id === 'vbFull' ? 18 : 16));
+      el.setAttribute('aria-label', label); el.title = label;
+    }
+  }
+  // Full screen: the app fills the whole browser tab. Only the app's own title bar stays, to come back from.
+  function setMaximised(on) {
+    const t = activeTab();
+    maxTid = on && t ? t.tid : null;
+    document.body.classList.toggle('is-max', Boolean(maxTid));
+    updateMaxButtons(); layoutAll();
+  }
+  // Minimise: back to the app you used before this one, or Home if there is none. The app keeps running.
+  function minimiseActive() {
+    const t = activeTab();
+    if (!t) return;
+    activate(tabHistory.find((tid) => tid !== t.tid && tabById(tid)) || 'home');
+  }
+  $('#appbarMin').addEventListener('click', minimiseActive);
+  $('#appbarMax').addEventListener('click', () => setMaximised(!maxTid));
+  $('#vbFull').addEventListener('click', () => setMaximised(!maxTid));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && maxTid) setMaximised(false); });
+  updateMaxButtons();
 
   // ---------- small screens: a bigger virtual window, scaled to fit, with zoom and move ----------
   // Apps are desktop-style and need room. On a narrow screen each app gets a window at least
@@ -507,7 +574,8 @@
 
   function updateViewbar(m, zoomed) {
     const bar = $('#viewbar');
-    bar.hidden = !(m.small && activeTab());
+    bar.hidden = !((m.small || mqSmall.matches) && activeTab());
+    $('#vbControls').hidden = !m.small; $('#vbToggle').hidden = !m.small; // zoom controls only where the app is scaled
     bar.classList.toggle('collapsed', view.collapsed);
     $('#vbLabel').textContent = `${Math.round(m.s * 100)}%`;
     $('#vbOut').disabled = m.s <= m.fit + 0.01;
@@ -553,6 +621,7 @@
   function activate(id) {
     if (id === 'settings') settingsOpen = true;
     else if (id !== 'home') { const t0 = tabById(id); if (!t0 || !appById(t0.app)) id = 'home'; }
+    if (maxTid && id !== maxTid) setMaximised(false);
     active = id;
     $('#home').hidden = id !== 'home';
     $('#settingsWin').hidden = id !== 'settings';
@@ -568,6 +637,8 @@
       const t = tabById(id);
       const a = appById(t.app);
       lastTab[t.app] = id;
+      const hi = tabHistory.indexOf(id); if (hi >= 0) tabHistory.splice(hi, 1);
+      tabHistory.unshift(id);
       const f = frames.get(id) || makeFrame(t);
       const w = wraps.get(id);
       w.vp.classList.add('active'); w.vp.inert = false;
@@ -618,7 +689,7 @@
 
   $('#fitPref').addEventListener('change', (e) => { prefs.fit = e.target.checked; store.set('fit', prefs.fit); layoutAll(); });
 
-  function saveSession() { if (prefs.restore) store.set('session', { tabs: openTabs.map((t) => ({ tid: t.tid, app: t.app, num: t.num })), active, seq: tidSeq, settings: settingsOpen }); }
+  function saveSession() { if (prefs.restore) store.set('session', { tabs: openTabs.map((t) => ({ tid: t.tid, app: t.app, num: t.num, title: t.title || '' })), active, seq: tidSeq, settings: settingsOpen }); }
 
   window.addEventListener('beforeunload', (e) => {
     if (!prefs.warn || !frames.size) return undefined;
@@ -694,19 +765,26 @@
   }
 
   // ---------- Settings screen: preferences for everyone, admin tools behind a sign-in ----------
-  const ADMIN_PAGES = ['apps', 'addapp', 'groups', 'footer'];
+  const ADMIN_PAGES = ['apps', 'store', 'addapp', 'groups', 'footer'];
   const SET_PAGES = [
     { id: 'prefs', group: 'General', label: 'Preferences', icon: SLIDERS },
-    { id: 'about', group: 'General', label: 'Help and about', icon: INFO },
+    { id: 'help-using', group: 'Help and support', label: 'Using the apps', icon: INFO },
+    { id: 'help-fix', group: 'Help and support', label: 'Fixing problems', icon: TOOL },
+    { id: 'help-adding', group: 'Help and support', label: 'Adding apps', icon: PLUS },
+    { id: 'help-limits', group: 'Help and support', label: 'Limits and privacy', icon: LOCK },
+    { id: 'help-support', group: 'Help and support', label: 'Contact support', icon: CHAT },
     { id: 'signin', group: 'Admin', label: 'Admin sign-in', icon: LOCK, when: 'out' },
     { id: 'apps', group: 'Admin', label: 'Apps', icon: GRID, when: 'in' },
+    { id: 'store', group: 'Admin', label: 'App store', icon: STORE, when: 'in' },
     { id: 'addapp', group: 'Admin', label: 'Add or edit an app', icon: PLUS, when: 'in' },
     { id: 'groups', group: 'Admin', label: 'Groups', icon: FOLDER, when: 'in' },
     { id: 'footer', group: 'Admin', label: 'Home page footer', icon: LAYOUT, when: 'in' },
   ];
   let adminShown = false;
 
-  const stopAdminPoll = () => { clearInterval(pollTimer); pollTimer = null; };
+  let storePoll = null;
+  const stopStorePoll = () => { clearInterval(storePoll); storePoll = null; };
+  const stopAdminPoll = () => { clearInterval(pollTimer); pollTimer = null; stopStorePoll(); };
 
   function renderSettingsNav() {
     const items = [];
@@ -736,6 +814,7 @@
     displayPage(id);
     if (ADMIN_PAGES.includes(id)) refreshAdmin().catch((e) => { if (e.status === 401) signOut('Your sign-in is no longer valid. Please sign in again.'); });
     else stopAdminPoll();
+    if (id === 'store') loadStore(); else stopStorePoll();
     if (id === 'prefs') renderProtection();
     if (id === 'signin') setTimeout(() => { if (active === 'settings') $('#tokenInput').focus(); }, 0);
   }
@@ -772,7 +851,6 @@
   $('#manageBtn').addEventListener('click', () => openSettings());
   $('#railSettings').addEventListener('click', () => { drawerOpen = false; openSettings(); });
   $('#settingsClose').addEventListener('click', closeSettings);
-  $('#openHelpBtn').addEventListener('click', () => $('#helpDlg').showModal());
   $('#loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     token = $('#tokenInput').value; $('#tokenInput').value = ''; $('#loginErr').textContent = '';
@@ -1052,6 +1130,102 @@
     }
   }
 
+  // ---------- App store: known projects from the official launcher, checked for a web build ----------
+  let storeData = null;
+
+  const ago = (iso) => {
+    const s = (Date.now() - Date.parse(iso)) / 1000;
+    if (!(s >= 0)) return '';
+    if (s < 90) return 'just now';
+    const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+    return s < 3600 ? rtf.format(-Math.round(s / 60), 'minute') : s < 86400 ? rtf.format(-Math.round(s / 3600), 'hour') : rtf.format(-Math.round(s / 86400), 'day');
+  };
+
+  async function loadStore() {
+    try { storeData = await api('/api/admin/store'); }
+    catch (e) { if (e.status === 401) signOut('Your sign-in is no longer valid. Please sign in again.'); return; }
+    renderStore();
+    if (storeData.refreshing && !storePoll) storePoll = setInterval(loadStore, 2500);
+    if (!storeData.refreshing && storePoll) stopStorePoll();
+  }
+
+  const isReady = (e) => !e.installed && e.web && e.web.status !== 'no';
+
+  function storeCard(e) {
+    const w = e.web || {};
+    const letter = h('span', { class: 'sico letter', 'aria-hidden': 'true', text: e.name.slice(0, 1).toUpperCase() });
+    const pic = e.icon ? h('img', { class: 'sico', src: `/store-icons/${e.id}?v=${encodeURIComponent(storeData.fetchedAt || '0')}`, alt: '', width: 48, height: 48, onerror(ev) { ev.target.replaceWith(letter); } }) : letter;
+    const status = e.installed ? ['Installed in this hub', 'ok'] : w.status === 'yes' ? [`Web build found (${w.tag})`, 'ok'] : w.status === 'no' ? ['No web build yet', 'no'] : ['Web build not checked yet', ''];
+    const actions = [];
+    if (e.installed) actions.push(h('button', { class: 'btn', type: 'button', disabled: true }, 'Added'));
+    else if (w.status === 'no') actions.push(h('button', { class: 'btn', type: 'button', onclick: () => recheckStore(e) }, 'Check again'));
+    else actions.push(h('button', { class: 'btn solid', type: 'button', onclick: () => addFromStore(e) }, 'Add'));
+    actions.push(h('a', { class: 'btn ghost', href: `https://github.com/${e.repo}`, target: '_blank', rel: 'noopener noreferrer' }, 'GitHub'));
+    if (e.website) actions.push(h('a', { class: 'btn ghost', href: e.website, target: '_blank', rel: 'noopener noreferrer' }, 'Website'));
+    return h('div', { class: 'store-card', 'data-id': e.id },
+      pic,
+      h('div', { class: 'stx' },
+        h('h4', {}, e.name, e.isNew ? h('span', { class: 'badge new', text: 'New' }) : null, e.community ? h('span', { class: 'badge comm', title: 'A community project, not made by the ArtCraft team', text: 'Community' }) : null),
+        h('p', { text: e.description || e.repo })),
+      h('p', { class: `sstatus ${status[1]}`, text: status[0] }),
+      h('div', { class: 'sactions' }, actions));
+  }
+
+  function renderStore() {
+    if (!storeData) return;
+    const q = $('#storeSearch').value.trim().toLowerCase();
+    const mode = $('#storeFilter').value;
+    const shown = storeData.entries.filter((e) => {
+      if (q && !`${e.name} ${e.description} ${e.repo}`.toLowerCase().includes(q)) return false;
+      return mode === 'ready' ? isReady(e) : mode === 'installed' ? e.installed : mode === 'unavailable' ? !e.installed && e.web && e.web.status === 'no' : true;
+    });
+    $('#storeGrid').replaceChildren(...(shown.length ? shown.map(storeCard) : [h('p', { class: 'empty', text: 'No projects match.' })]));
+    const ready = storeData.entries.filter((e) => !e.installed && e.web && e.web.status === 'yes').length;
+    $('#storeAddAll').disabled = !ready;
+    $('#storeAddAll').textContent = ready ? `Add all ready (${ready})` : 'Add all ready';
+    $('#storeRefresh').disabled = storeData.refreshing;
+    $('#storeStamp').textContent = storeData.refreshing ? 'Refreshing the list and checking each project for a web build…'
+      : storeData.fetchedAt ? `${storeData.entries.length} projects. Updated ${ago(storeData.fetchedAt)} from the official ArtCraft Launcher.`
+        : `${storeData.entries.length} projects from the built-in list. The launcher’s own list has not been fetched yet.`;
+  }
+
+  async function addFromStore(e) {
+    try {
+      const res = await api('/api/admin/apps', { method: 'POST', body: JSON.stringify({ repo: e.repo, name: e.name, category: e.category, description: e.description }) });
+      if (res.app && res.app.installing) trackJob(res.app.id, res.app.name || e.name, 'install', null);
+    } catch (err) { toast(err.message); }
+    await loadStore();
+  }
+  async function recheckStore(e) {
+    try { await api('/api/admin/store/check', { method: 'POST', body: JSON.stringify({ id: e.id }) }); } catch (err) { toast(err.message); }
+    await loadStore();
+  }
+  // One at a time, so a small server is not asked to download and unpack everything at once.
+  async function waitInstalled(id) {
+    for (let i = 0; i < 150; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      try { const a = (await api('/api/admin/apps')).apps.find((x) => x.id === id); if (!a || !a.installing) return; } catch { return; }
+    }
+  }
+  $('#storeAddAll').addEventListener('click', async () => {
+    const todo = storeData.entries.filter((e) => !e.installed && e.web && e.web.status === 'yes');
+    if (!todo.length || !confirm(`Add ${todo.length} app${todo.length === 1 ? '' : 's'} from the store?\n\nThey are installed one after another.`)) return;
+    $('#storeAddAll').disabled = true;
+    for (const e of todo) {
+      try {
+        const res = await api('/api/admin/apps', { method: 'POST', body: JSON.stringify({ repo: e.repo, name: e.name, category: e.category, description: e.description }) });
+        if (res.app && res.app.installing) { trackJob(res.app.id, res.app.name || e.name, 'install', null); await loadStore(); await waitInstalled(res.app.id); }
+      } catch (err) { toast(err.message); }
+    }
+    await loadStore();
+  });
+  $('#storeRefresh').addEventListener('click', async () => {
+    try { await api('/api/admin/store/refresh', { method: 'POST', body: JSON.stringify({ force: true }) }); } catch (err) { toast(err.message); }
+    await loadStore();
+  });
+  $('#storeSearch').addEventListener('input', renderStore);
+  $('#storeFilter').addEventListener('change', renderStore);
+
   // ---------- home page footer settings ----------
   function fillSiteForm(s) {
     if (document.activeElement && document.activeElement.closest && document.activeElement.closest('#siteForm')) return; // don't overwrite typing
@@ -1076,7 +1250,7 @@
     if (s && Array.isArray(s.tabs)) {
       tidSeq = Number(s.seq) || 0;
       openTabs = s.tabs.map((x) => (typeof x === 'string' ? { app: x } : x)).filter((x) => x && appById(x.app))
-        .map((x) => ({ tid: typeof x.tid === 'string' && /^t\d+$/.test(x.tid) ? x.tid : `t${++tidSeq}`, app: x.app, num: Number(x.num) || 1 }));
+        .map((x) => ({ tid: typeof x.tid === 'string' && /^t\d+$/.test(x.tid) ? x.tid : `t${++tidSeq}`, app: x.app, num: Number(x.num) || 1, title: typeof x.title === 'string' ? x.title.slice(0, 200) : '', stale: Boolean(x.title) }));
       for (const t of openTabs) tidSeq = Math.max(tidSeq, Number(t.tid.slice(1)) || 0);
       settingsOpen = Boolean(s.settings);
       if (openTabs.length || settingsOpen) {

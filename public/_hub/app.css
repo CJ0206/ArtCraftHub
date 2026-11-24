@@ -372,3 +372,33 @@ input[type="color"] { width: 2.4rem; height: 2rem; padding: 2px; background: var
   .set-main { padding: 1rem 1rem 2.5rem; }
   .set-title { font-size: 1.35rem; }
 }
+
+/* ---------- window controls, full screen and document names ---------- */
+.appbar-info .doc { color: var(--muted); font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.appbar-info .doc::before { content: "\2014"; margin-right: .55rem; opacity: .55; }
+.appbar-info .nm { flex: none; }
+body.is-max .bar, body.is-max .notice, body.is-max .rail, body.is-max .rail-scrim { display: none !important; }
+body.is-max .appwin { inset: 0; border: 0; border-radius: 0; box-shadow: none; }
+.viewbar .vb-controls[hidden], .viewbar button[hidden] { display: none; }
+
+/* ---------- App store ---------- */
+.set-page[data-page="store"] { max-width: 72rem; }
+.store-bar { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin: 0 0 .5rem; }
+.store-bar input[type="search"] { flex: 1 1 14rem; min-width: 10rem; width: auto; }
+.store-bar select { padding: .55rem .7rem; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: .5rem; }
+.store-bar .grow { flex: 1 1 0; }
+.store-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr)); gap: .8rem; margin-top: .6rem; }
+.store-card { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .5rem .9rem; align-content: start; padding: 1rem; background: var(--card); border: 1px solid var(--line); border-radius: .9rem; }
+.store-card .sico { width: 3rem; height: 3rem; border-radius: .75rem; object-fit: cover; background: var(--raised-2); }
+.store-card .sico.letter { display: grid; place-items: center; font: 700 1.3rem var(--display); color: var(--accent); background: color-mix(in srgb, var(--accent) 20%, var(--raised-2)); }
+.store-card h4 { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .45rem; margin: 0; font: 650 1rem var(--display); }
+.store-card .stx p { margin: .2rem 0 0; color: var(--muted); font-size: .88rem; line-height: 1.4; overflow-wrap: anywhere; }
+.store-card .sstatus { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: .8rem; }
+.store-card .sstatus.ok { color: var(--ok); }
+.store-card .sstatus.no { color: var(--danger); }
+.store-card .sactions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
+.store-card .sactions .btn { padding: .3rem .8rem; font-size: .85rem; text-decoration: none; }
+.badge.new { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); }
+.badge.comm { background: color-mix(in srgb, var(--muted) 22%, transparent); color: var(--muted); }
+.support-line { margin: 0; font-size: 1rem; }
+.support-line a { color: var(--accent); }
